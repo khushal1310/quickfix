@@ -43,7 +43,7 @@ export function Navbar() {
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
         {/* Branding Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href={isAuthenticated && user ? `/${user.role}` : "/"} className="flex items-center gap-2">
           <span className="insta-gradient p-1.5 rounded-lg text-white">
             <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0-1.1.9-2 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
