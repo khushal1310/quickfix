@@ -3,10 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Lock, Phone, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Lock, Phone, Mail, Eye, EyeOff, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -14,41 +11,35 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Navbar } from '@/components/layout/Navbar';
 
-// Login form validation schema using Zod
-const loginSchema = z.object({
-  mobileNumber: z.string().min(10, 'Mobile number must be at least 10 digits').max(15, 'Invalid mobile number'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-type LoginInput = z.infer<typeof loginSchema>;
-
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+  
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // Login flow states
+  const [loginMode, setLoginMode] = useState<'mobile' | 'email'>('mobile');
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      mobileNumber: '',
-      password: '',
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const identifier = loginMode === 'mobile' ? mobileNumber : email;
+    if (!identifier || !password) {
+      toastError('Please fill in all required fields.');
+      return;
     }
-  });
 
-  const onSubmit = async (data: LoginInput) => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await login(data.mobileNumber, data.password);
+      const res = await login(identifier, password);
       if (res.success) {
         toastSuccess('Logged in successfully!');
-        // Get active user to determine redirect path
         const userJson = localStorage.getItem('qf_user');
         if (userJson) {
           const userObj = JSON.parse(userJson);
@@ -67,86 +58,223 @@ export default function LoginPage() {
     }
   };
 
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      toastSuccess('Apple sign-in simulated successfully!');
+      const res = await login('1111111111', 'password123'); // Demo customer Alice
+      if (res.success) {
+        router.push('/customer');
+      } else {
+        setErrorMsg(res.error || 'Apple login simulation failed.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      toastSuccess('Google sign-in simulated successfully!');
+      const res = await login('1111111111', 'password123'); // Demo customer Alice
+      if (res.success) {
+        router.push('/customer');
+      } else {
+        setErrorMsg(res.error || 'Google login simulation failed.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
       <div className="flex flex-1 items-center justify-center p-4">
-        <Card className="w-full max-w-md border-border bg-card">
-          <CardHeader className="space-y-1 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-2">
-              <span className="text-lg font-bold text-primary">QF</span>
+        <Card className="w-full max-w-md border-border bg-card p-4 rounded-2xl shadow-lg">
+          <CardHeader className="space-y-2 text-center pb-4">
+            {/* QuickFix Rounded Icon */}
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black shadow-md mb-2">
+              <span className="text-xl font-black text-white tracking-wider">QF</span>
             </div>
-            <CardTitle className="text-2xl font-black tracking-tight text-foreground">Welcome Back</CardTitle>
-            <CardDescription className="text-muted-foreground text-sm">
-              Log in to connect with service providers or manage requests.
+            <CardTitle className="text-2xl font-extrabold tracking-tight text-foreground">
+              Get started with QuickFix
+            </CardTitle>
+            <CardDescription className="text-muted-foreground text-xs">
+              Enter details below to manage service orders or requests.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <CardContent className="space-y-4">
+            <form onSubmit={onSubmit} className="space-y-3">
               {errorMsg && (
-                <div className="flex items-center gap-2 rounded-xl bg-red-500/10 p-3.5 text-sm font-semibold text-red-500 border border-red-500/20">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
+                <div className="flex items-center gap-2 rounded-xl bg-red-500/10 p-3 text-xs font-semibold text-red-500 border border-red-500/20">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
                   <span>{errorMsg}</span>
                 </div>
               )}
 
-              {/* Mobile Number Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="tel"
-                    placeholder="Enter mobile number"
-                    className="pl-10"
-                    {...register('mobileNumber')}
-                  />
+              {/* Input Switch */}
+              {loginMode === 'mobile' ? (
+                /* Mobile Number input with simulated country selector */
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile number</label>
+                  <div className="flex gap-2">
+                    {/* Simulated Country Dropdown */}
+                    <div className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-muted/20 text-foreground cursor-pointer select-none text-sm font-semibold">
+                      <span>🇮🇳</span>
+                      <svg className="h-3 w-3 text-muted-foreground fill-current" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                    </div>
+                    {/* Input field with +91 prefix */}
+                    <div className="relative flex-1">
+                      <span className="absolute left-3.5 top-3 text-sm font-bold text-foreground">+91</span>
+                      <Input
+                        type="tel"
+                        maxLength={10}
+                        placeholder="9081520177"
+                        className="pl-12 pr-10 text-sm font-semibold rounded-xl border border-border"
+                        value={mobileNumber}
+                        onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                        required
+                      />
+                      <Phone className="absolute right-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
                 </div>
-                {errors.mobileNumber && (
-                  <p className="text-xs font-medium text-red-500">{errors.mobileNumber.message}</p>
-                )}
-              </div>
+              ) : (
+                /* Email Address input */
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email address</label>
+                  <div className="relative">
+                    <Input
+                      type="email"
+                      placeholder="name@example.com"
+                      className="pl-10 pr-4 text-sm font-semibold rounded-xl border border-border"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                    <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              )}
 
-              {/* Password Input */}
+              {/* Password input */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-                  <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
-                    Forgot Password?
-                  </Link>
-                </div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Enter password"
-                    className="pl-10"
-                    {...register('password')}
+                    className="pl-10 pr-10 text-sm font-semibold rounded-xl border border-border"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
                   />
+                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground focus:outline-none"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-                {errors.password && (
-                  <p className="text-xs font-medium text-red-500">{errors.password.message}</p>
-                )}
               </div>
 
-              {/* Action Button */}
-              <Button type="submit" size="lg" className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold mt-2" disabled={loading}>
+              {/* Submit Button */}
+              <Button 
+                type="submit" 
+                className="w-full rounded-xl bg-black text-white hover:bg-black/90 font-bold h-11 transition-all mt-4" 
+                disabled={loading}
+              >
                 {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Signing In...
-                  </>
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </>
-                )}
+                  <span className="flex items-center gap-1.5 justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Continuing...
+                  </span>
+                ) : 'Continue'}
               </Button>
             </form>
+
+            {/* OR Separator */}
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-border/80"></div>
+              <span className="flex-shrink mx-4 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">or</span>
+              <div className="flex-grow border-t border-border/80"></div>
+            </div>
+
+            {/* Social Logins */}
+            <div className="space-y-2">
+              <Button
+                type="button"
+                onClick={handleAppleSignIn}
+                className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
+              >
+                <svg className="h-4 w-4 fill-current text-foreground" viewBox="0 0 24 24">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.69-1.12 1.84-.98 2.94.97.08 2.15-.52 2.81-1.33z"/>
+                </svg>
+                Continue with Apple
+              </Button>
+
+              <Button
+                type="button"
+                onClick={handleGoogleSignIn}
+                className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
+              >
+                <svg className="h-4 w-4 fill-current text-red-500" viewBox="0 0 24 24">
+                  <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.478 0-6.3-2.823-6.3-6.3 0-3.478 2.822-6.3 6.3-6.3 1.706 0 3.24.68 4.363 1.774l3.076-3.076C19.488 2.802 16.035 1 11.99 1 5.92 1 11.99s4.92 10.99 10.99 10.99c5.967 0 10.983-4.29 10.983-10.99 0-.727-.08-1.282-.236-1.705H12.24z"/>
+                </svg>
+                Continue with Google
+              </Button>
+
+              {loginMode === 'mobile' ? (
+                <Button
+                  type="button"
+                  onClick={() => setLoginMode('email')}
+                  className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
+                >
+                  <Mail className="h-4 w-4 text-foreground" />
+                  Continue with Email
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={() => setLoginMode('mobile')}
+                  className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
+                >
+                  <Phone className="h-4 w-4 text-foreground" />
+                  Continue with Mobile
+                </Button>
+              )}
+            </div>
+
+            {/* OR Separator */}
+            <div className="relative flex py-2 items-center">
+              <div className="flex-grow border-t border-border/80"></div>
+              <span className="flex-shrink mx-4 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">or</span>
+              <div className="flex-grow border-t border-border/80"></div>
+            </div>
+
+            {/* Find Account / Forgot Password */}
+            <Link 
+              href="/forgot-password" 
+              className="flex items-center justify-center gap-2 py-1 text-sm font-bold text-foreground hover:underline transition-all"
+            >
+              <Search className="h-4 w-4 text-foreground stroke-[3px]" />
+              Find my account
+            </Link>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-2 text-center text-sm border-t border-border pt-4">
-            <span className="text-muted-foreground">
+          <CardFooter className="flex flex-col space-y-4 text-center text-[10px] border-t border-border/60 pt-4 mt-2">
+            <span className="text-muted-foreground leading-normal px-2">
+              You consent to receive a verification code by text or Whatsapp. Message and data rates may apply.
+            </span>
+            <span className="text-muted-foreground font-semibold text-xs pt-1">
               Don&apos;t have an account?{' '}
               <Link href="/register" className="font-bold text-primary hover:underline">
                 Sign Up

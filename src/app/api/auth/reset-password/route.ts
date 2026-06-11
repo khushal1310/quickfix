@@ -18,10 +18,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch OTP record
+    const isEmail = mobileNumber.includes('@');
+    const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
+
     const { data: otpRecord, error: fetchError } = await supabaseAdmin
       .from('user_otps')
       .select('*')
-      .eq('mobile_number', mobileNumber)
+      .eq('mobile_number', inputIdentifier)
       .eq('action_type', 'RESET')
       .maybeSingle();
 
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({ password_hash: passwordHash })
-      .eq('mobile_number', mobileNumber);
+      .eq(isEmail ? 'email' : 'mobile_number', inputIdentifier);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });

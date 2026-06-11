@@ -11,25 +11,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Mobile number and password are required.' }, { status: 400 });
     }
 
-    // 1. Fetch user by mobile number
-    const { data: userRecord, error: fetchError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('mobile_number', mobileNumber)
-      .maybeSingle();
+    // 1. Fetch user by mobile number or email
+    const isEmail = mobileNumber.includes('@');
+    let query = supabaseAdmin.from('users').select('*');
+    if (isEmail) {
+      query = query.eq('email', mobileNumber.toLowerCase().trim());
+    } else {
+      query = query.eq('mobile_number', mobileNumber.trim());
+    }
+
+    const { data: userRecord, error: fetchError } = await query.maybeSingle();
 
     if (fetchError) {
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
     if (!userRecord) {
-      return NextResponse.json({ error: 'Invalid mobile number or password.' }, { status: 400 });
+      return NextResponse.json({ error: isEmail ? 'Invalid email or password.' : 'Invalid mobile number or password.' }, { status: 400 });
     }
 
     // 2. Compare password hash
     const isPasswordMatch = await bcrypt.compare(password, userRecord.password_hash);
     if (!isPasswordMatch) {
-      return NextResponse.json({ error: 'Invalid mobile number or password.' }, { status: 400 });
+      return NextResponse.json({ error: isEmail ? 'Invalid email or password.' : 'Invalid mobile number or password.' }, { status: 400 });
     }
 
     // 3. Sign custom JWT token

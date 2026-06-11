@@ -10,23 +10,29 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Verify user exists
-    const { data: user, error: checkError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('mobile_number', mobileNumber)
-      .maybeSingle();
+    const isEmail = mobileNumber.includes('@');
+    const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
+    
+    let query = supabaseAdmin.from('users').select('id');
+    if (isEmail) {
+      query = query.eq('email', inputIdentifier);
+    } else {
+      query = query.eq('mobile_number', inputIdentifier);
+    }
+
+    const { data: user, error: checkError } = await query.maybeSingle();
 
     if (checkError) {
       return NextResponse.json({ error: checkError.message }, { status: 500 });
     }
 
     if (!user) {
-      return NextResponse.json({ error: 'No user registered with this mobile number.' }, { status: 404 });
+      return NextResponse.json({ error: isEmail ? 'No user registered with this email address.' : 'No user registered with this mobile number.' }, { status: 404 });
     }
 
     // 2. Generate 4-digit OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log(`[QuickFix SMS Simulator] Password Reset OTP for ${mobileNumber}: ${otpCode}`);
+    console.log(`[QuickFix SMS Simulator] Password Reset OTP for ${inputIdentifier}: ${otpCode}`);
 
     // 3. Store in user_otps table
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry
@@ -35,7 +41,7 @@ export async function POST(req: NextRequest) {
       .from('user_otps')
       .upsert(
         {
-          mobile_number: mobileNumber,
+          mobile_number: inputIdentifier,
           otp_code: otpCode,
           action_type: 'RESET',
           temp_user_data: null,

@@ -305,6 +305,19 @@ export default function ProviderDashboard() {
     <div className="flex min-h-screen flex-col bg-background pb-20 sm:pb-0">
       <Navbar />
 
+      <div className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b border-border/80 py-3 px-4 text-center text-xs flex justify-center items-center gap-2.5 shadow-sm">
+        <span className="text-muted-foreground font-bold">Need to book a service for yourself?</span>
+        <Button 
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/customer')}
+          className="h-7 text-xs font-bold rounded-lg border-primary/30 text-primary hover:bg-primary/5"
+        >
+          Switch to Customer Mode &rarr;
+        </Button>
+      </div>
+
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-8 md:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-8">
           <div>

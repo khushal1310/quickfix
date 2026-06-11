@@ -34,7 +34,7 @@ export default function CustomerDashboard() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push('/login');
-    } else if (!authLoading && user && user.role !== 'customer') {
+    } else if (!authLoading && user && user.role !== 'customer' && user.role !== 'provider') {
       router.push(`/${user.role}`);
     }
   }, [isAuthenticated, user, authLoading]);
@@ -570,6 +570,19 @@ export default function CustomerDashboard() {
   return (
     <div className="flex min-h-screen flex-col bg-background pb-20 sm:pb-0">
       <Navbar />
+
+      {user.role === 'provider' && (
+        <div className="bg-amber-500 text-white font-bold py-2.5 px-4 text-center text-xs flex justify-center items-center gap-2 shadow-inner">
+          <span>You are currently in Customer Mode (for booking services for yourself).</span>
+          <button 
+            type="button"
+            onClick={() => router.push('/provider')}
+            className="underline hover:text-amber-100 flex items-center gap-0.5"
+          >
+            Back to Provider Dashboard &rarr;
+          </button>
+        </div>
+      )}
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-8 md:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-8">
