@@ -1,0 +1,443 @@
+{
+  "users": [
+    {
+      "id": "admin-1",
+      "role": "admin",
+      "full_name": "Admin Moderation",
+      "mobile_number": "9999999999",
+      "password_hash": "$2b$10$TQUpXy1bLzC9R00LSCB8aeQQKGUQO/NUUnqo2mXQGy70c6qAB9ni.",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=Admin",
+      "is_suspended": false,
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "customer-1",
+      "role": "customer",
+      "full_name": "Alice Customer",
+      "mobile_number": "1111111111",
+      "password_hash": "$2b$10$TQUpXy1bLzC9R00LSCB8aeQQKGUQO/NUUnqo2mXQGy70c6qAB9ni.",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=Alice",
+      "is_suspended": false,
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "provider-1",
+      "role": "provider",
+      "full_name": "Bob Provider",
+      "mobile_number": "2222222222",
+      "password_hash": "$2b$10$TQUpXy1bLzC9R00LSCB8aeQQKGUQO/NUUnqo2mXQGy70c6qAB9ni.",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=Bob",
+      "is_suspended": false,
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "219k7uy",
+      "created_at": "2026-06-11T16:39:22.111Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "mxhra0q",
+      "created_at": "2026-06-11T16:39:27.774Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "ktz9gxv",
+      "created_at": "2026-06-11T16:39:33.843Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "7ffz4oe",
+      "created_at": "2026-06-11T16:39:39.545Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "5uu60pj",
+      "created_at": "2026-06-11T16:39:44.582Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "tlrfca2",
+      "created_at": "2026-06-11T16:39:49.558Z",
+      "role": "customer",
+      "full_name": "tittu",
+      "mobile_number": "9081520177",
+      "password_hash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=tittu"
+    },
+    {
+      "id": "69rr01r",
+      "created_at": "2026-06-11T16:42:46.607Z",
+      "role": "customer",
+      "full_name": "Test User OTP",
+      "mobile_number": "9139782877",
+      "password_hash": "$2b$10$cAG8pvYX8DE6wMqjt1YPKunzFbnG4tD.UmMoEpp4o2nnF6BmmWw1i",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=Test%20User%20OTP"
+    },
+    {
+      "id": "t6795m1",
+      "created_at": "2026-06-11T16:44:06.978Z",
+      "role": "customer",
+      "full_name": "Test User OTP",
+      "mobile_number": "9162807108",
+      "password_hash": "$2b$10$mrENSg0W5A2Y2oeq1gJ4ZuAw6Z8EmHsH3l5CNTseOMu0v/vS8C79e",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=Test%20User%20OTP"
+    },
+    {
+      "id": "y4ovxml",
+      "created_at": "2026-06-11T16:48:59.304Z",
+      "role": "provider",
+      "full_name": "pooja",
+      "mobile_number": "7211126627",
+      "password_hash": "$2b$10$ooLXgB8GrIUp6DsnurVOveUGkbUqcPzPimz9q4R4j/ELYEnzB0V2G",
+      "profile_image": "https://api.dicebear.com/7.x/adventurer/svg?seed=pooja"
+    }
+  ],
+  "service_categories": [
+    {
+      "id": "cat-1",
+      "name": "Cleaning",
+      "icon": "Sparkles",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "cat-2",
+      "name": "Plumbing",
+      "icon": "Wrench",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "cat-3",
+      "name": "Electrician",
+      "icon": "Zap",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "cat-4",
+      "name": "Appliance Repair",
+      "icon": "Cpu",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "cat-5",
+      "name": "Painting",
+      "icon": "Paintbrush",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    },
+    {
+      "id": "cat-6",
+      "name": "Pest Control",
+      "icon": "Bug",
+      "created_at": "2026-06-11T16:39:14.658Z"
+    }
+  ],
+  "service_requests": [
+    {
+      "id": "e4rz7ok",
+      "created_at": "2026-06-11T16:44:17.921Z",
+      "customer_id": "customer-1",
+      "category_id": "cat-2",
+      "description": "Leaking pipe under kitchen sink.",
+      "address": "123 Main St, Apartment 4B",
+      "budget": 150,
+      "status": "OPEN"
+    },
+    {
+      "id": "nev5tn8",
+      "created_at": "2026-06-11T16:44:32.055Z",
+      "customer_id": "customer-1",
+      "category_id": "cat-2",
+      "description": "Leaking pipe under kitchen sink.",
+      "address": "123 Main St, Apartment 4B",
+      "budget": 150,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "7tqqpmt",
+      "created_at": "2026-06-11T16:44:42.518Z",
+      "customer_id": "customer-1",
+      "category_id": "cat-2",
+      "description": "Leaking pipe under kitchen sink.",
+      "address": "123 Main St, Apartment 4B",
+      "budget": 150,
+      "status": "SELECTED"
+    },
+    {
+      "id": "5gwqqa1",
+      "created_at": "2026-06-11T16:44:58.421Z",
+      "customer_id": "customer-1",
+      "category_id": "cat-2",
+      "description": "Leaking pipe under kitchen sink.",
+      "address": "123 Main St, Apartment 4B",
+      "budget": 150,
+      "status": "SELECTED"
+    },
+    {
+      "id": "rpgr8tu",
+      "created_at": "2026-06-11T16:45:11.203Z",
+      "customer_id": "customer-1",
+      "category_id": "cat-2",
+      "description": "Leaking pipe under kitchen sink.",
+      "address": "123 Main St, Apartment 4B",
+      "budget": 150,
+      "status": "COMPLETED"
+    },
+    {
+      "id": "2pr6h2e",
+      "created_at": "2026-06-11T16:47:34.912Z",
+      "customer_id": "219k7uy",
+      "category_id": "cat-3",
+      "description": "hello bhailog",
+      "area": "Sector 5 (GPS: 21.7547, 72.0986)",
+      "city": "San Francisco",
+      "budget": 150,
+      "status": "COMPLETED"
+    }
+  ],
+  "request_images": [],
+  "provider_accepts": [
+    {
+      "id": "gw54o6f",
+      "created_at": "2026-06-11T16:44:17.922Z",
+      "provider_id": "provider-1",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "7bnk36b",
+      "created_at": "2026-06-11T16:44:32.056Z",
+      "request_id": "nev5tn8",
+      "provider_id": "provider-1",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "10g3ige",
+      "created_at": "2026-06-11T16:44:42.519Z",
+      "request_id": "7tqqpmt",
+      "provider_id": "provider-1",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "jpz6inq",
+      "created_at": "2026-06-11T16:44:58.422Z",
+      "request_id": "5gwqqa1",
+      "provider_id": "provider-1",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "h1i061y",
+      "created_at": "2026-06-11T16:45:11.210Z",
+      "request_id": "rpgr8tu",
+      "provider_id": "provider-1",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "fjxmrpv",
+      "created_at": "2026-06-11T16:49:20.042Z",
+      "request_id": "2pr6h2e",
+      "provider_id": "y4ovxml",
+      "status": "ACCEPTED"
+    }
+  ],
+  "orders": [
+    {
+      "id": "5p481lt",
+      "created_at": "2026-06-11T16:44:42.548Z",
+      "request_id": "7tqqpmt",
+      "customer_id": "customer-1",
+      "provider_id": "provider-1",
+      "status": "SELECTED"
+    },
+    {
+      "id": "j1qo0qx",
+      "created_at": "2026-06-11T16:44:58.571Z",
+      "request_id": "5gwqqa1",
+      "customer_id": "customer-1",
+      "provider_id": "provider-1",
+      "status": "SELECTED"
+    },
+    {
+      "id": "9lt9h87",
+      "created_at": "2026-06-11T16:45:11.239Z",
+      "request_id": "rpgr8tu",
+      "customer_id": "customer-1",
+      "provider_id": "provider-1",
+      "status": "COMPLETED",
+      "started_at": "2026-06-11T16:45:11.254Z",
+      "completed_at": "2026-06-11T16:45:11.261Z"
+    },
+    {
+      "id": "l012uuw",
+      "created_at": "2026-06-11T16:49:46.493Z",
+      "request_id": "2pr6h2e",
+      "customer_id": "219k7uy",
+      "provider_id": "y4ovxml",
+      "status": "COMPLETED",
+      "started_at": "2026-06-11T16:50:35.765Z",
+      "completed_at": "2026-06-11T16:50:39.860Z"
+    }
+  ],
+  "wallets": [
+    {
+      "id": "wallet-bob",
+      "provider_id": "provider-1",
+      "balance": 135,
+      "held_amount": 30,
+      "available_amount": 135
+    },
+    {
+      "id": "wallet-y4ovxml",
+      "provider_id": "y4ovxml",
+      "balance": 0,
+      "held_amount": 15,
+      "available_amount": 0
+    }
+  ],
+  "wallet_transactions": [
+    {
+      "id": "v68w11k",
+      "created_at": "2026-06-11T16:44:42.548Z",
+      "wallet_id": "wallet-bob",
+      "type": "Hold",
+      "amount": 15,
+      "description": "Platform fee hold of $15 for Order ID: 5p481lt"
+    },
+    {
+      "id": "rljk3ri",
+      "created_at": "2026-06-11T16:44:58.571Z",
+      "wallet_id": "wallet-bob",
+      "type": "Hold",
+      "amount": 15,
+      "description": "Platform fee hold of $15 for Order ID: j1qo0qx"
+    },
+    {
+      "id": "0i0ihwt",
+      "created_at": "2026-06-11T16:45:11.239Z",
+      "wallet_id": "wallet-bob",
+      "type": "Hold",
+      "amount": 15,
+      "description": "Platform fee hold of $15 for Order ID: 9lt9h87"
+    },
+    {
+      "id": "zy938dw",
+      "created_at": "2026-06-11T16:45:11.267Z",
+      "wallet_id": "wallet-bob",
+      "type": "Credit",
+      "amount": 150,
+      "description": "Job earnings of $150 for Order ID: 9lt9h87"
+    },
+    {
+      "id": "jg1e6nz",
+      "created_at": "2026-06-11T16:45:11.267Z",
+      "wallet_id": "wallet-bob",
+      "type": "Fee Deduction",
+      "amount": 15,
+      "description": "Platform fee deduction of $15 for Order ID: 9lt9h87"
+    },
+    {
+      "id": "vv38d6g",
+      "created_at": "2026-06-11T16:49:46.494Z",
+      "wallet_id": "wallet-y4ovxml",
+      "type": "Hold",
+      "amount": 15,
+      "description": "Platform fee hold of $15 for Order ID: l012uuw"
+    }
+  ],
+  "chat_rooms": [
+    {
+      "id": "zqa2r7b",
+      "created_at": "2026-06-11T16:44:42.548Z",
+      "order_id": "5p481lt"
+    },
+    {
+      "id": "bepowst",
+      "created_at": "2026-06-11T16:44:58.571Z",
+      "order_id": "j1qo0qx"
+    },
+    {
+      "id": "ku4o0ne",
+      "created_at": "2026-06-11T16:45:11.239Z",
+      "order_id": "9lt9h87"
+    },
+    {
+      "id": "dbh9bet",
+      "created_at": "2026-06-11T16:49:46.493Z",
+      "order_id": "l012uuw"
+    }
+  ],
+  "chat_messages": [
+    {
+      "id": "1zxhgox",
+      "created_at": "2026-06-11T16:44:58.579Z",
+      "room_id": "j1qo0qx",
+      "sender_id": "customer-1",
+      "message_text": "Hi Bob, when can you come?"
+    },
+    {
+      "id": "1c36n7g",
+      "created_at": "2026-06-11T16:44:58.585Z",
+      "room_id": "j1qo0qx",
+      "sender_id": "provider-1",
+      "message_text": "Hi Alice, I can arrive in 20 minutes."
+    },
+    {
+      "id": "y39jlvq",
+      "created_at": "2026-06-11T16:45:11.244Z",
+      "room_id": "9lt9h87",
+      "sender_id": "customer-1",
+      "message_text": "Hi Bob, when can you come?"
+    },
+    {
+      "id": "vsdre3i",
+      "created_at": "2026-06-11T16:45:11.249Z",
+      "room_id": "9lt9h87",
+      "sender_id": "provider-1",
+      "message_text": "Hi Alice, I can arrive in 20 minutes."
+    },
+    {
+      "id": "b8pm3d6",
+      "created_at": "2026-06-11T16:50:04.207Z",
+      "room_id": "dbh9bet",
+      "sender_id": "219k7uy",
+      "message": "hello",
+      "image_url": null,
+      "is_read": true
+    }
+  ],
+  "disputes": [],
+  "user_otps": [
+    {
+      "id": "wvfpkv0",
+      "created_at": "2026-06-11T16:39:14.730Z",
+      "mobile_number": "9081520177",
+      "otp_code": "7117",
+      "action_type": "REGISTER",
+      "temp_user_data": {
+        "fullName": "tittu",
+        "mobileNumber": "9081520177",
+        "passwordHash": "$2b$10$BXPY2OXGdvfvpkDrVXacveBdx5h6P8vy4EYyTEVZeTSUdgHFN9dCG",
+        "role": "customer",
+        "serviceCategory": null
+      },
+      "expires_at": "2026-06-11T16:54:14.730Z"
+    }
+  ]
+}

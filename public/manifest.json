@@ -1,0 +1,22 @@
+{
+  "name": "QuickFix Service Marketplace",
+  "short_name": "QuickFix",
+  "description": "Find Local Service Providers Instantly",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fafafa",
+  "theme_color": "#e1306c",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/identicon/svg?seed=QuickFix",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://api.dicebear.com/7.x/identicon/svg?seed=QuickFixReady",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
