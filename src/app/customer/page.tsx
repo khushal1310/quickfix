@@ -14,7 +14,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   Sparkles, Wrench, Zap, Cpu, Paintbrush, Bug, 
-  MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History
+  MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History,
+  Home, Briefcase
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -51,6 +52,19 @@ export default function CustomerDashboard() {
   const [budget, setBudget] = useState('');
   const [images, setImages] = useState<File[]>([]);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  // Saved Addresses states
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('custom');
+  const [saveNewAddress, setSaveNewAddress] = useState(false);
+  const [newAddressLabel, setNewAddressLabel] = useState('Home');
+  const [addressManagerOpen, setAddressManagerOpen] = useState(false);
+  
+  // Address Manager Add Form states
+  const [mgrLabel, setMgrLabel] = useState('Home');
+  const [mgrArea, setMgrArea] = useState('');
+  const [mgrCity, setMgrCity] = useState('');
+  const [addingAddress, setAddingAddress] = useState(false);
 
   // Data states
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
@@ -116,6 +130,17 @@ export default function CustomerDashboard() {
 
   const fetchCustomerData = async () => {
     if (!user) return;
+    
+    // Fetch latest user profile to get saved addresses
+    const { data: profile } = await supabase
+      .from('users')
+      .select('addresses')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile && profile.addresses) {
+      setSavedAddresses(profile.addresses);
+    }
     
     // 1. Fetch Service Requests (OPEN / ACCEPTED / SELECTED)
     const { data: reqs } = await supabase
@@ -223,6 +248,72 @@ export default function CustomerDashboard() {
     );
   };
 
+  // Selection handler for Saved Addresses
+  const handleSelectAddress = (addrId: string) => {
+    setSelectedAddressId(addrId);
+    if (addrId === 'custom') {
+      setArea('');
+      setCity('');
+    } else {
+      const selected = savedAddresses.find(a => a.id === addrId);
+      if (selected) {
+        setArea(selected.area);
+        setCity(selected.city);
+      }
+    }
+  };
+
+  // Add Address in Manager
+  const handleAddManagerAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mgrArea || !mgrCity) {
+      toastError('Please fill in both Area and City.');
+      return;
+    }
+
+    setAddingAddress(true);
+    try {
+      const newAddr = {
+        id: `addr-${Math.random().toString(36).substring(2, 9)}`,
+        label: mgrLabel,
+        area: mgrArea,
+        city: mgrCity
+      };
+      const updated = [...savedAddresses, newAddr];
+      const { error } = await supabase.from('users').update({ addresses: updated }).eq('id', user?.id);
+      
+      if (error) throw error;
+      setSavedAddresses(updated);
+      setMgrArea('');
+      setMgrCity('');
+      toastSuccess('New address saved successfully!');
+    } catch (err: any) {
+      toastError(err.message || 'Failed to save address.');
+    } finally {
+      setAddingAddress(false);
+    }
+  };
+
+  // Delete Address in Manager
+  const handleDeleteManagerAddress = async (addrId: string) => {
+    if (!confirm('Are you sure you want to delete this saved address?')) return;
+    try {
+      const updated = savedAddresses.filter(a => a.id !== addrId);
+      const { error } = await supabase.from('users').update({ addresses: updated }).eq('id', user?.id);
+      
+      if (error) throw error;
+      setSavedAddresses(updated);
+      if (selectedAddressId === addrId) {
+        setSelectedAddressId('custom');
+        setArea('');
+        setCity('');
+      }
+      toastSuccess('Address deleted successfully.');
+    } catch (err: any) {
+      toastError(err.message || 'Failed to delete address.');
+    }
+  };
+
   // Image Upload helper
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -249,6 +340,31 @@ export default function CustomerDashboard() {
 
     setLoading(true);
     try {
+      // If custom address is chosen and "Save address" checkbox is checked, save it to profile
+      if (selectedAddressId === 'custom' && saveNewAddress && user) {
+        const newAddressObj = {
+          id: `addr-${Math.random().toString(36).substring(2, 9)}`,
+          label: newAddressLabel || 'Home',
+          area: area,
+          city: city,
+        };
+        const updatedAddresses = [...savedAddresses, newAddressObj];
+        
+        // Update in MongoDB
+        const { error: profileUpdateError } = await supabase
+          .from('users')
+          .update({ addresses: updatedAddresses })
+          .eq('id', user.id);
+
+        if (!profileUpdateError) {
+          setSavedAddresses(updatedAddresses);
+          setSelectedAddressId(newAddressObj.id);
+          setSaveNewAddress(false);
+        } else {
+          console.error('Error saving user address:', profileUpdateError);
+        }
+      }
+
       // 1. Insert Request record
       const { data: request, error: reqError } = await supabase
         .from('service_requests')
@@ -491,35 +607,172 @@ export default function CustomerDashboard() {
                     </div>
 
                     {/* Location Info */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Location</label>
-                        <Button 
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Service Location</label>
+                        <button 
                           type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={handleGetLocation} 
-                          className="h-7 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg flex items-center gap-1"
-                          disabled={fetchingLocation}
+                          onClick={() => setAddressManagerOpen(true)}
+                          className="text-xs font-bold text-primary hover:underline"
                         >
-                          <MapPin className="h-3.5 w-3.5" />
-                          {fetchingLocation ? 'Fetching...' : 'Use GPS'}
-                        </Button>
+                          Manage Addresses
+                        </button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          placeholder="Area / Street"
-                          value={area}
-                          onChange={(e) => setArea(e.target.value)}
-                          required
-                        />
-                        <Input
-                          placeholder="City"
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          required
-                        />
+                      
+                      {/* Horizontal Address Cards */}
+                      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-border">
+                        {savedAddresses.map((addr) => {
+                          const isSelected = selectedAddressId === addr.id;
+                          return (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => handleSelectAddress(addr.id)}
+                              className={`flex-shrink-0 w-40 p-3 rounded-xl border text-left transition-all relative ${
+                                isSelected 
+                                  ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                                  : 'border-border bg-card hover:bg-muted/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 mb-1.5">
+                                {addr.label === 'Home' ? (
+                                  <Home className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                                ) : addr.label === 'Work' ? (
+                                  <Briefcase className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                                ) : (
+                                  <MapPin className={`h-4 w-4 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                                )}
+                                <span className="text-sm font-semibold truncate text-foreground">{addr.label}</span>
+                                {isSelected && (
+                                  <span className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5">
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                                {addr.area}, {addr.city}
+                              </p>
+                            </button>
+                          );
+                        })}
+                        
+                        {/* Custom Address Card */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAddress('custom')}
+                          className={`flex-shrink-0 w-40 p-3 rounded-xl border text-left transition-all relative ${
+                            selectedAddressId === 'custom' 
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary' 
+                              : 'border-border bg-card hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Plus className={`h-4 w-4 ${selectedAddressId === 'custom' ? 'text-primary' : 'text-muted-foreground'}`} />
+                            <span className="text-sm font-semibold text-foreground">Custom</span>
+                            {selectedAddressId === 'custom' && (
+                              <span className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-0.5">
+                                <Check className="h-3 w-3" />
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                            Enter manual address or use GPS coordinates
+                          </p>
+                        </button>
                       </div>
+
+                      {/* Address Fields / Info */}
+                      {selectedAddressId === 'custom' ? (
+                        <div className="space-y-3 bg-muted/20 p-3.5 rounded-xl border border-border mt-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-semibold text-foreground">Custom Address Details</span>
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={handleGetLocation} 
+                              className="h-7 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg flex items-center gap-1"
+                              disabled={fetchingLocation}
+                            >
+                              <MapPin className="h-3.5 w-3.5" />
+                              {fetchingLocation ? 'Fetching...' : 'Use GPS'}
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              placeholder="Area / Street"
+                              value={area}
+                              onChange={(e) => setArea(e.target.value)}
+                              required
+                            />
+                            <Input
+                              placeholder="City"
+                              value={city}
+                              onChange={(e) => setCity(e.target.value)}
+                              required
+                            />
+                          </div>
+                          
+                          {/* Save Address Option */}
+                          <div className="space-y-2 pt-1 border-t border-border/50">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="saveNewAddress"
+                                checked={saveNewAddress}
+                                onChange={(e) => setSaveNewAddress(e.target.checked)}
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary bg-card"
+                              />
+                              <label htmlFor="saveNewAddress" className="text-xs font-medium text-foreground cursor-pointer select-none">
+                                Save this address for future use
+                              </label>
+                            </div>
+                            
+                            {saveNewAddress && (
+                              <div className="flex items-center gap-2.5 pl-6 pt-1">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Label as:</span>
+                                <div className="flex gap-1.5">
+                                  {['Home', 'Work', 'Other'].map((lbl) => (
+                                    <button
+                                      key={lbl}
+                                      type="button"
+                                      onClick={() => setNewAddressLabel(lbl)}
+                                      className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                                        newAddressLabel === lbl
+                                          ? 'bg-primary border-primary text-primary-foreground shadow-sm'
+                                          : 'bg-card border-border text-muted-foreground hover:bg-muted/50'
+                                      }`}
+                                    >
+                                      {lbl}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-start justify-between gap-3 mt-1">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Selected Address ({savedAddresses.find(a => a.id === selectedAddressId)?.label})</span>
+                            <p className="text-sm font-semibold text-foreground leading-snug">
+                              {savedAddresses.find(a => a.id === selectedAddressId)?.area}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {savedAddresses.find(a => a.id === selectedAddressId)?.city}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSelectAddress('custom')}
+                            className="h-7 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg flex-shrink-0"
+                          >
+                            Use Custom Address
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Budget */}
@@ -893,6 +1146,123 @@ export default function CustomerDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Address Manager Dialog */}
+      <Dialog open={addressManagerOpen} onOpenChange={setAddressManagerOpen}>
+        <DialogContent className="max-w-md border-border bg-card p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              Manage Saved Addresses
+            </DialogTitle>
+            <DialogDescription>
+              Add or remove your saved service locations here.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 my-2">
+            {/* List of current addresses */}
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Saved Locations</span>
+              {savedAddresses.length === 0 ? (
+                <div className="py-6 text-center text-muted-foreground text-xs border border-dashed border-border rounded-xl">
+                  No saved addresses found. Add one below!
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {savedAddresses.map((addr) => (
+                    <div key={addr.id} className="flex justify-between items-center p-3 border border-border bg-background/50 rounded-xl hover:bg-background/80 transition-colors">
+                      <div className="space-y-0.5 min-w-0 pr-4">
+                        <div className="flex items-center gap-1.5">
+                          {addr.label === 'Home' ? (
+                            <Home className="h-3.5 w-3.5 text-primary" />
+                          ) : addr.label === 'Work' ? (
+                            <Briefcase className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                          )}
+                          <span className="text-xs font-bold text-foreground">{addr.label}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{addr.area}</p>
+                        <p className="text-[10px] text-muted-foreground/80">{addr.city}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => handleDeleteManagerAddress(addr.id)}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add address form */}
+            <form onSubmit={handleAddManagerAddress} className="space-y-3 pt-3 border-t border-border">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Add New Location</span>
+              
+              {/* Label as pills */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Label</label>
+                <div className="flex gap-2">
+                  {['Home', 'Work', 'Other'].map((lbl) => (
+                    <button
+                      key={lbl}
+                      type="button"
+                      onClick={() => setMgrLabel(lbl)}
+                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                        mgrLabel === lbl
+                          ? 'bg-primary border-primary text-primary-foreground shadow-sm'
+                          : 'bg-card border-border text-muted-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Area & City inputs */}
+              <div className="space-y-2">
+                <Input
+                  placeholder="Area / Street Address"
+                  value={mgrArea}
+                  onChange={(e) => setMgrArea(e.target.value)}
+                  required
+                />
+                <Input
+                  placeholder="City"
+                  value={mgrCity}
+                  onChange={(e) => setMgrCity(e.target.value)}
+                  required
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-sm h-10 mt-1"
+                disabled={addingAddress}
+              >
+                {addingAddress ? (
+                  <span className="flex items-center gap-1.5 justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                  </span>
+                ) : 'Add Address'}
+              </Button>
+            </form>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" className="rounded-xl w-full" onClick={() => setAddressManagerOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -71,6 +71,7 @@ const defaultUsers = [
     profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Admin',
     is_suspended: false,
     created_at: new Date().toISOString(),
+    addresses: [],
   },
   {
     id: 'customer-1',
@@ -81,6 +82,10 @@ const defaultUsers = [
     profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Alice',
     is_suspended: false,
     created_at: new Date().toISOString(),
+    addresses: [
+      { id: 'addr-1', label: 'Home', area: 'A-402 Shrinand Nagar, Sector 21', city: 'Gandhinagar' },
+      { id: 'addr-2', label: 'Work', area: 'GIFT City, Tower II, Block C', city: 'Gandhinagar' }
+    ],
   },
   {
     id: 'provider-1',
@@ -91,6 +96,7 @@ const defaultUsers = [
     profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Bob',
     is_suspended: false,
     created_at: new Date().toISOString(),
+    addresses: [],
   },
 ];
 
