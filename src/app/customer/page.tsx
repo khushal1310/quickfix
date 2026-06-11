@@ -60,10 +60,16 @@ export default function CustomerDashboard() {
   const [newAddressLabel, setNewAddressLabel] = useState('Home');
   const [addressManagerOpen, setAddressManagerOpen] = useState(false);
   
+  // Create Request Address Details states
+  const [flatNo, setFlatNo] = useState('');
+  const [landmark, setLandmark] = useState('');
+
   // Address Manager Add Form states
   const [mgrLabel, setMgrLabel] = useState('Home');
   const [mgrArea, setMgrArea] = useState('');
   const [mgrCity, setMgrCity] = useState('');
+  const [mgrFlatNo, setMgrFlatNo] = useState('');
+  const [mgrLandmark, setMgrLandmark] = useState('');
   const [addingAddress, setAddingAddress] = useState(false);
 
   // Data states
@@ -219,11 +225,17 @@ export default function CustomerDashboard() {
             const data = await res.json();
             const addr = data.address || {};
             
-            // Extract a clean neighborhood/street and city/town
-            const areaName = addr.suburb || addr.neighbourhood || addr.road || addr.village || addr.subdistrict || 'Local Area';
+            // Extract a clean neighborhood/street and city/town/state
+            const road = addr.road || '';
+            const neighborhood = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.subdistrict || '';
+            const county = addr.county || addr.district || '';
+            
+            // Build a clean, natural street and area address without coordinate numbers
+            const parts = [road, neighborhood, county].filter(Boolean);
+            const streetAndArea = parts.length > 0 ? parts.join(', ') : 'Local Area';
             const cityName = addr.city || addr.town || addr.municipality || addr.state || 'Local City';
             
-            setArea(`${areaName} (GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+            setArea(streetAndArea);
             setCity(cityName);
             toastSuccess('Location prefilled using GPS!');
           } else {
@@ -231,7 +243,7 @@ export default function CustomerDashboard() {
           }
         } catch (e) {
           console.error(e);
-          setArea(`GPS Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+          setArea('Local Street, Tech District');
           setCity('Local City');
           toastSuccess('GPS coordinates loaded!');
         } finally {
@@ -254,11 +266,15 @@ export default function CustomerDashboard() {
     if (addrId === 'custom') {
       setArea('');
       setCity('');
+      setFlatNo('');
+      setLandmark('');
     } else {
       const selected = savedAddresses.find(a => a.id === addrId);
       if (selected) {
         setArea(selected.area);
         setCity(selected.city);
+        setFlatNo(selected.flatNo || '');
+        setLandmark(selected.landmark || '');
       }
     }
   };
@@ -276,8 +292,10 @@ export default function CustomerDashboard() {
       const newAddr = {
         id: `addr-${Math.random().toString(36).substring(2, 9)}`,
         label: mgrLabel,
+        flatNo: mgrFlatNo,
         area: mgrArea,
-        city: mgrCity
+        city: mgrCity,
+        landmark: mgrLandmark
       };
       const updated = [...savedAddresses, newAddr];
       const { error } = await supabase.from('users').update({ addresses: updated }).eq('id', user?.id);
@@ -286,6 +304,8 @@ export default function CustomerDashboard() {
       setSavedAddresses(updated);
       setMgrArea('');
       setMgrCity('');
+      setMgrFlatNo('');
+      setMgrLandmark('');
       toastSuccess('New address saved successfully!');
     } catch (err: any) {
       toastError(err.message || 'Failed to save address.');
@@ -307,6 +327,8 @@ export default function CustomerDashboard() {
         setSelectedAddressId('custom');
         setArea('');
         setCity('');
+        setFlatNo('');
+        setLandmark('');
       }
       toastSuccess('Address deleted successfully.');
     } catch (err: any) {
@@ -345,8 +367,10 @@ export default function CustomerDashboard() {
         const newAddressObj = {
           id: `addr-${Math.random().toString(36).substring(2, 9)}`,
           label: newAddressLabel || 'Home',
+          flatNo: flatNo,
           area: area,
           city: city,
+          landmark: landmark,
         };
         const updatedAddresses = [...savedAddresses, newAddressObj];
         
@@ -365,6 +389,14 @@ export default function CustomerDashboard() {
         }
       }
 
+      let combinedArea = area;
+      if (flatNo) {
+        combinedArea = `${flatNo}, ${combinedArea}`;
+      }
+      if (landmark) {
+        combinedArea = `${combinedArea} (Landmark: ${landmark})`;
+      }
+
       // 1. Insert Request record
       const { data: request, error: reqError } = await supabase
         .from('service_requests')
@@ -372,7 +404,7 @@ export default function CustomerDashboard() {
           customer_id: user?.id,
           category_id: selectedCategory,
           description,
-          area,
+          area: combinedArea,
           city,
           budget: budget ? parseFloat(budget) : null,
           status: 'OPEN',
@@ -683,9 +715,9 @@ export default function CustomerDashboard() {
 
                       {/* Address Fields / Info */}
                       {selectedAddressId === 'custom' ? (
-                        <div className="space-y-3 bg-muted/20 p-3.5 rounded-xl border border-border mt-1">
-                          <div className="flex justify-between items-center">
-                            <span className="text-xs font-semibold text-foreground">Custom Address Details</span>
+                        <div className="space-y-3 bg-muted/20 p-4 rounded-xl border border-border mt-1 shadow-sm">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-xs font-bold uppercase tracking-wider text-foreground">Custom Address Details</span>
                             <Button 
                               type="button" 
                               variant="ghost" 
@@ -698,23 +730,49 @@ export default function CustomerDashboard() {
                               {fetchingLocation ? 'Fetching...' : 'Use GPS'}
                             </Button>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input
-                              placeholder="Area / Street"
-                              value={area}
-                              onChange={(e) => setArea(e.target.value)}
-                              required
-                            />
-                            <Input
-                              placeholder="City"
-                              value={city}
-                              onChange={(e) => setCity(e.target.value)}
-                              required
-                            />
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Flat / House No. / Building</label>
+                              <Input
+                                placeholder="e.g. Flat 402, Block A"
+                                value={flatNo}
+                                onChange={(e) => setFlatNo(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Street / Area / Locality</label>
+                              <Input
+                                placeholder="e.g. Shrinand Nagar, Sector 21"
+                                value={area}
+                                onChange={(e) => setArea(e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Landmark (Optional)</label>
+                              <Input
+                                placeholder="e.g. Near Swaminarayan Temple"
+                                value={landmark}
+                                onChange={(e) => setLandmark(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
+                              <Input
+                                placeholder="e.g. Gandhinagar"
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
+                                required
+                              />
+                            </div>
                           </div>
                           
                           {/* Save Address Option */}
-                          <div className="space-y-2 pt-1 border-t border-border/50">
+                          <div className="space-y-2 pt-2 border-t border-border/50">
                             <div className="flex items-center gap-2">
                               <input
                                 type="checkbox"
@@ -752,24 +810,45 @@ export default function CustomerDashboard() {
                           </div>
                         </div>
                       ) : (
-                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-start justify-between gap-3 mt-1">
-                          <div className="space-y-0.5">
-                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Selected Address ({savedAddresses.find(a => a.id === selectedAddressId)?.label})</span>
-                            <p className="text-sm font-semibold text-foreground leading-snug">
-                              {savedAddresses.find(a => a.id === selectedAddressId)?.area}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {savedAddresses.find(a => a.id === selectedAddressId)?.city}
-                            </p>
+                        <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-2xl flex items-start justify-between gap-4 mt-1 shadow-sm">
+                          <div className="space-y-1.5 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
+                                savedAddresses.find(a => a.id === selectedAddressId)?.label === 'Home'
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                  : savedAddresses.find(a => a.id === selectedAddressId)?.label === 'Work'
+                                  ? 'bg-purple-50 text-purple-600 border-purple-200'
+                                  : 'bg-amber-50 text-amber-600 border-amber-200'
+                              }`}>
+                                {savedAddresses.find(a => a.id === selectedAddressId)?.label}
+                              </span>
+                              <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Selected Location</span>
+                            </div>
+                            <div>
+                              {savedAddresses.find(a => a.id === selectedAddressId)?.flatNo && (
+                                <p className="text-sm font-bold text-foreground">
+                                  {savedAddresses.find(a => a.id === selectedAddressId)?.flatNo}
+                                </p>
+                              )}
+                              <p className="text-sm font-semibold text-foreground/80 leading-snug">
+                                {savedAddresses.find(a => a.id === selectedAddressId)?.area}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {savedAddresses.find(a => a.id === selectedAddressId)?.city}
+                                {savedAddresses.find(a => a.id === selectedAddressId)?.landmark && (
+                                  <span className="text-muted-foreground/70"> • Landmark: {savedAddresses.find(a => a.id === selectedAddressId)?.landmark}</span>
+                                )}
+                              </p>
+                            </div>
                           </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => handleSelectAddress('custom')}
-                            className="h-7 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg flex-shrink-0"
+                            className="h-8 text-xs font-bold text-primary hover:bg-primary/10 rounded-lg flex-shrink-0"
                           >
-                            Use Custom Address
+                            Change
                           </Button>
                         </div>
                       )}
@@ -1151,48 +1230,62 @@ export default function CustomerDashboard() {
 
       {/* Address Manager Dialog */}
       <Dialog open={addressManagerOpen} onOpenChange={setAddressManagerOpen}>
-        <DialogContent className="max-w-md border-border bg-card p-6">
+        <DialogContent className="max-w-md border-border bg-card p-6 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
-              Manage Saved Addresses
+              Saved Addresses
             </DialogTitle>
             <DialogDescription>
-              Add or remove your saved service locations here.
+              Manage and select your saved service locations.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-5 my-2">
+          <div className="space-y-6 my-2">
             {/* List of current addresses */}
-            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Saved Locations</span>
               {savedAddresses.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-xs border border-dashed border-border rounded-xl">
-                  No saved addresses found. Add one below!
+                <div className="py-8 text-center text-muted-foreground text-sm border border-dashed border-border rounded-xl">
+                  No saved addresses found. Add a new location below!
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {savedAddresses.map((addr) => (
-                    <div key={addr.id} className="flex justify-between items-center p-3 border border-border bg-background/50 rounded-xl hover:bg-background/80 transition-colors">
-                      <div className="space-y-0.5 min-w-0 pr-4">
-                        <div className="flex items-center gap-1.5">
+                    <div key={addr.id} className="flex justify-between items-start p-4 border border-border bg-background rounded-2xl shadow-sm hover:shadow-md hover:border-primary/20 transition-all">
+                      <div className="space-y-1.5 min-w-0 pr-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${
+                            addr.label === 'Home'
+                              ? 'bg-blue-50 text-blue-600 border-blue-200'
+                              : addr.label === 'Work'
+                              ? 'bg-purple-50 text-purple-600 border-purple-200'
+                              : 'bg-amber-50 text-amber-600 border-amber-200'
+                          }`}>
+                            {addr.label}
+                          </span>
                           {addr.label === 'Home' ? (
-                            <Home className="h-3.5 w-3.5 text-primary" />
+                            <Home className="h-3.5 w-3.5 text-muted-foreground" />
                           ) : addr.label === 'Work' ? (
-                            <Briefcase className="h-3.5 w-3.5 text-primary" />
+                            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
                           ) : (
-                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                           )}
-                          <span className="text-xs font-bold text-foreground">{addr.label}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{addr.area}</p>
-                        <p className="text-[10px] text-muted-foreground/80">{addr.city}</p>
+                        <div>
+                          {addr.flatNo && <p className="text-sm font-bold text-foreground leading-snug">{addr.flatNo}</p>}
+                          <p className="text-xs font-semibold text-muted-foreground truncate leading-relaxed">{addr.area}</p>
+                          <p className="text-[11px] text-muted-foreground/80 leading-normal">
+                            {addr.city}
+                            {addr.landmark && <span className="text-muted-foreground/60"> • Landmark: {addr.landmark}</span>}
+                          </p>
+                        </div>
                       </div>
                       <Button
                         type="button"
                         size="icon"
                         variant="ghost"
-                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl"
                         onClick={() => handleDeleteManagerAddress(addr.id)}
                       >
                         <Trash className="h-4 w-4" />
@@ -1204,19 +1297,19 @@ export default function CustomerDashboard() {
             </div>
 
             {/* Add address form */}
-            <form onSubmit={handleAddManagerAddress} className="space-y-3 pt-3 border-t border-border">
+            <form onSubmit={handleAddManagerAddress} className="space-y-4 pt-4 border-t border-border">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Add New Location</span>
               
               {/* Label as pills */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Label</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Label Address As</label>
                 <div className="flex gap-2">
                   {['Home', 'Work', 'Other'].map((lbl) => (
                     <button
                       key={lbl}
                       type="button"
                       onClick={() => setMgrLabel(lbl)}
-                      className={`flex-1 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                      className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${
                         mgrLabel === lbl
                           ? 'bg-primary border-primary text-primary-foreground shadow-sm'
                           : 'bg-card border-border text-muted-foreground hover:bg-muted/50'
@@ -1228,32 +1321,57 @@ export default function CustomerDashboard() {
                 </div>
               </div>
 
-              {/* Area & City inputs */}
-              <div className="space-y-2">
-                <Input
-                  placeholder="Area / Street Address"
-                  value={mgrArea}
-                  onChange={(e) => setMgrArea(e.target.value)}
-                  required
-                />
-                <Input
-                  placeholder="City"
-                  value={mgrCity}
-                  onChange={(e) => setMgrCity(e.target.value)}
-                  required
-                />
+              {/* Form Inputs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Flat / House No. / Building</label>
+                  <Input
+                    placeholder="e.g. Flat 402, Block A"
+                    value={mgrFlatNo}
+                    onChange={(e) => setMgrFlatNo(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Street / Area / Locality</label>
+                  <Input
+                    placeholder="e.g. Shrinand Nagar, Sector 21"
+                    value={mgrArea}
+                    onChange={(e) => setMgrArea(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Landmark (Optional)</label>
+                  <Input
+                    placeholder="e.g. Near Swaminarayan Temple"
+                    value={mgrLandmark}
+                    onChange={(e) => setMgrLandmark(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">City</label>
+                  <Input
+                    placeholder="e.g. Gandhinagar"
+                    value={mgrCity}
+                    onChange={(e) => setMgrCity(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
 
               <Button
                 type="submit"
-                className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-sm h-10 mt-1"
+                className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold text-sm h-10 mt-2 shadow-sm"
                 disabled={addingAddress}
               >
                 {addingAddress ? (
                   <span className="flex items-center gap-1.5 justify-center">
                     <Loader2 className="h-4 w-4 animate-spin" /> Saving...
                   </span>
-                ) : 'Add Address'}
+                ) : 'Save New Address'}
               </Button>
             </form>
           </div>
