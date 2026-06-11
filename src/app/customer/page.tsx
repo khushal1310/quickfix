@@ -187,16 +187,36 @@ export default function CustomerDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        // Mock reverse geocoding for speed, but fully visual and operational
-        setArea(`Sector 5 (GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
-        setCity('San Francisco');
-        setFetchingLocation(false);
-        toastSuccess('Location coordinates prefilled!');
+        try {
+          // Query OpenStreetMap Nominatim for real-time reverse geocoding based on GPS coords
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`);
+          if (res.ok) {
+            const data = await res.json();
+            const addr = data.address || {};
+            
+            // Extract a clean neighborhood/street and city/town
+            const areaName = addr.suburb || addr.neighbourhood || addr.road || addr.village || addr.subdistrict || 'Local Area';
+            const cityName = addr.city || addr.town || addr.municipality || addr.state || 'Local City';
+            
+            setArea(`${areaName} (GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+            setCity(cityName);
+            toastSuccess('Location prefilled using GPS!');
+          } else {
+            throw new Error('Reverse geocoding response not OK');
+          }
+        } catch (e) {
+          console.error(e);
+          setArea(`GPS Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+          setCity('Local City');
+          toastSuccess('GPS coordinates loaded!');
+        } finally {
+          setFetchingLocation(false);
+        }
       },
       (error) => {
         console.error(error);
         setArea('Tech District');
-        setCity('San Francisco');
+        setCity('Local City');
         setFetchingLocation(false);
         toastError('Location access denied. Manual entry loaded.');
       }
