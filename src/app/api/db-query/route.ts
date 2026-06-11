@@ -1,112 +1,139 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readDb, writeDb, DbSchema } from '@/lib/mockDb';
+import { getDb } from '@/lib/mongodb';
 
 export async function POST(req: NextRequest) {
   try {
     const { action, table, filters, data, id, order, limit, onConflict: topOnConflict } = await req.json();
 
-    const db = readDb();
-    let records = db[table as keyof DbSchema] || [];
+    const mongoDb = await getDb();
+    const col = mongoDb.collection(table);
 
     if (action === 'select') {
-      // 1. Apply ID filter if specified
+      // 1. Build MongoDB query filter
+      const query: any = {};
       if (id) {
-        records = records.filter((r: any) => r.id === id);
+        query.id = id;
       }
 
-      // 2. Apply Custom Filters
       if (filters && Array.isArray(filters)) {
         for (const filter of filters) {
           const { column, op, value } = filter;
           
           if (op === 'eq') {
-            records = records.filter((r: any) => r[column] === value);
+            query[column] = value;
           } else if (op === 'neq') {
-            records = records.filter((r: any) => r[column] !== value);
+            query[column] = { $ne: value };
           } else if (op === 'in') {
-            records = records.filter((r: any) => Array.isArray(value) && value.includes(r[column]));
+            query[column] = { $in: value };
           } else if (op === 'lt') {
-            records = records.filter((r: any) => r[column] < value);
+            query[column] = { $lt: value };
           }
         }
       }
 
-      // 3. Resolve Joins and Counts
-      const resolvedRecords = records.map((record: any) => {
-        const copy = { ...record };
+      // 2. Execute find query
+      let cursor = col.find(query);
 
-        // Users mapping details
+      // 3. Apply sorting
+      if (order) {
+        const { column, ascending } = order;
+        cursor = cursor.sort({ [column]: ascending ? 1 : -1 });
+      }
+
+      // 4. Apply limit
+      if (limit) {
+        cursor = cursor.limit(limit);
+      }
+
+      const records = await cursor.toArray();
+
+      // 5. Resolve Joins and Counts
+      if (records.length > 0) {
         if (table === 'service_requests') {
-          // Join Category
-          copy.category = db.service_categories.find((c: any) => c.id === record.category_id);
-          // Join Customer
-          copy.customer = db.users.find((u: any) => u.id === record.customer_id);
-          // Join Images
-          copy.request_images = db.request_images.filter((img: any) => img.request_id === record.id);
-          // Join provider accepts count
-          const count = db.provider_accepts.filter((a: any) => a.request_id === record.id && a.status === 'ACCEPTED').length;
-          copy.provider_accepts = [{ count }];
+          const catIds = records.map(r => r.category_id).filter(Boolean);
+          const custIds = records.map(r => r.customer_id).filter(Boolean);
+          const reqIds = records.map(r => r.id).filter(Boolean);
+
+          const categories = await mongoDb.collection('service_categories').find({ id: { $in: catIds } }).toArray();
+          const customers = await mongoDb.collection('users').find({ id: { $in: custIds } }).toArray();
+          const images = await mongoDb.collection('request_images').find({ request_id: { $in: reqIds } }).toArray();
+          const accepts = await mongoDb.collection('provider_accepts').find({ request_id: { $in: reqIds }, status: 'ACCEPTED' }).toArray();
+
+          for (const record of records) {
+            record.category = categories.find(c => c.id === record.category_id) || null;
+            record.customer = customers.find(c => c.id === record.customer_id) || null;
+            record.request_images = images.filter(img => img.request_id === record.id);
+            const count = accepts.filter(a => a.request_id === record.id).length;
+            record.provider_accepts = [{ count }];
+          }
         }
 
         if (table === 'provider_accepts') {
-          // Join Provider details
-          copy.provider = db.users.find((u: any) => u.id === record.provider_id);
+          const provIds = records.map(r => r.provider_id).filter(Boolean);
+          const providers = await mongoDb.collection('users').find({ id: { $in: provIds } }).toArray();
+          for (const record of records) {
+            record.provider = providers.find(u => u.id === record.provider_id) || null;
+          }
         }
 
         if (table === 'orders') {
-          // Join Request
-          const reqItem = db.service_requests.find((r: any) => r.id === record.request_id);
-          if (reqItem) {
-            const reqCopy = { ...reqItem };
-            reqCopy.category = db.service_categories.find((c: any) => c.id === reqItem.category_id);
-            reqCopy.request_images = db.request_images.filter((img: any) => img.request_id === reqItem.id);
-            copy.request = reqCopy;
+          const reqIds = records.map(r => r.request_id).filter(Boolean);
+          const custIds = records.map(r => r.customer_id).filter(Boolean);
+          const provIds = records.map(r => r.provider_id).filter(Boolean);
+
+          const requests = await mongoDb.collection('service_requests').find({ id: { $in: reqIds } }).toArray();
+          const customers = await mongoDb.collection('users').find({ id: { $in: custIds } }).toArray();
+          const providers = await mongoDb.collection('users').find({ id: { $in: provIds } }).toArray();
+
+          const catIds = requests.map(r => r.category_id).filter(Boolean);
+          const reqItemIds = requests.map(r => r.id).filter(Boolean);
+          const categories = await mongoDb.collection('service_categories').find({ id: { $in: catIds } }).toArray();
+          const images = await mongoDb.collection('request_images').find({ request_id: { $in: reqItemIds } }).toArray();
+
+          for (const reqItem of requests) {
+            reqItem.category = categories.find(c => c.id === reqItem.category_id) || null;
+            reqItem.request_images = images.filter(img => img.request_id === reqItem.id);
           }
-          // Join Customer
-          copy.customer = db.users.find((u: any) => u.id === record.customer_id);
-          // Join Provider
-          copy.provider = db.users.find((u: any) => u.id === record.provider_id);
+
+          for (const record of records) {
+            record.request = requests.find(r => r.id === record.request_id) || null;
+            record.customer = customers.find(u => u.id === record.customer_id) || null;
+            record.provider = providers.find(u => u.id === record.provider_id) || null;
+          }
         }
 
         if (table === 'chat_messages') {
-          // Join Sender
-          copy.sender = db.users.find((u: any) => u.id === record.sender_id);
-        }
-
-        if (table === 'disputes') {
-          // Join Order
-          const ordItem = db.orders.find((o: any) => o.id === record.order_id);
-          if (ordItem) {
-            const ordCopy = { ...ordItem };
-            ordCopy.request = db.service_requests.find((r: any) => r.id === ordItem.request_id);
-            ordCopy.customer = db.users.find((u: any) => u.id === ordItem.customer_id);
-            ordCopy.provider = db.users.find((u: any) => u.id === ordItem.provider_id);
-            copy.order = ordCopy;
+          const senderIds = records.map(r => r.sender_id).filter(Boolean);
+          const senders = await mongoDb.collection('users').find({ id: { $in: senderIds } }).toArray();
+          for (const record of records) {
+            record.sender = senders.find(u => u.id === record.sender_id) || null;
           }
         }
 
-        return copy;
-      });
+        if (table === 'disputes') {
+          const ordIds = records.map(r => r.order_id).filter(Boolean);
+          const orders = await mongoDb.collection('orders').find({ id: { $in: ordIds } }).toArray();
+          
+          const reqIds = orders.map(o => o.request_id).filter(Boolean);
+          const custIds = orders.map(o => o.customer_id).filter(Boolean);
+          const provIds = orders.map(o => o.provider_id).filter(Boolean);
 
-      // Sort / Ordering
-      if (order) {
-        const { column, ascending } = order;
-        resolvedRecords.sort((a: any, b: any) => {
-          const valA = a[column];
-          const valB = b[column];
-          if (valA < valB) return ascending ? -1 : 1;
-          if (valA > valB) return ascending ? 1 : -1;
-          return 0;
-        });
+          const requests = await mongoDb.collection('service_requests').find({ id: { $in: reqIds } }).toArray();
+          const users = await mongoDb.collection('users').find({ id: { $in: [...custIds, ...provIds] } }).toArray();
+
+          for (const ord of orders) {
+            ord.request = requests.find(r => r.id === ord.request_id) || null;
+            ord.customer = users.find(u => u.id === ord.customer_id) || null;
+            ord.provider = users.find(u => u.id === ord.provider_id) || null;
+          }
+
+          for (const record of records) {
+            record.order = orders.find(o => o.id === record.order_id) || null;
+          }
+        }
       }
 
-      // Limit
-      let result = resolvedRecords;
-      if (limit) {
-        result = resolvedRecords.slice(0, limit);
-      }
-
-      return NextResponse.json({ data: result });
+      return NextResponse.json({ data: records });
     }
 
     if (action === 'insert') {
@@ -119,42 +146,36 @@ export async function POST(req: NextRequest) {
           created_at: new Date().toISOString(),
           ...item
         };
-        db[table as keyof DbSchema].push(newRecord);
         inserted.push(newRecord);
       }
 
-      writeDb(db);
+      await col.insertMany(inserted);
       return NextResponse.json({ data: inserted });
     }
 
     if (action === 'update') {
-      // Find matching items
-      let targetIds: string[] = [];
+      let targetQuery: any = {};
 
       if (id) {
-        targetIds = [id];
+        targetQuery.id = id;
       } else if (filters && Array.isArray(filters)) {
-        let matching = [...records];
         for (const filter of filters) {
           const { column, op, value } = filter;
           if (op === 'eq') {
-            matching = matching.filter((r: any) => r[column] === value);
+            targetQuery[column] = value;
           }
         }
-        targetIds = matching.map((m: any) => m.id);
       }
 
-      const updatedList: any[] = [];
-      const currentList = db[table as keyof DbSchema];
+      const items = await col.find(targetQuery).toArray();
+      const ids = items.map(i => i.id);
 
-      for (let i = 0; i < currentList.length; i++) {
-        if (targetIds.includes(currentList[i].id)) {
-          currentList[i] = { ...currentList[i], ...data };
-          updatedList.push(currentList[i]);
-        }
-      }
+      await col.updateMany(
+        { id: { $in: ids } },
+        { $set: data }
+      );
 
-      writeDb(db);
+      const updatedList = await col.find({ id: { $in: ids } }).toArray();
       return NextResponse.json({ data: updatedList });
     }
 
@@ -164,55 +185,58 @@ export async function POST(req: NextRequest) {
       const upserted: any[] = [];
 
       for (const item of upsertItems) {
-        let existingIndex = -1;
-        const currentList = db[table as keyof DbSchema];
+        const itemCopy = { ...item };
+        delete itemCopy.onConflict;
 
+        let query: any = {};
         if (onConflict) {
           const cols = onConflict.split(',').map((c: string) => c.trim());
-          existingIndex = currentList.findIndex((r: any) => {
-            return cols.every((col: string) => r[col] === item[col]);
+          cols.forEach((col: string) => {
+            query[col] = item[col];
           });
         } else if (item.id) {
-          existingIndex = currentList.findIndex((r: any) => r.id === item.id);
+          query.id = item.id;
         }
 
-        if (existingIndex !== -1) {
-          currentList[existingIndex] = { ...currentList[existingIndex], ...item };
-          upserted.push(currentList[existingIndex]);
+        const existing = await col.findOne(query);
+
+        if (existing) {
+          await col.updateOne(
+            { id: existing.id },
+            { $set: itemCopy }
+          );
+          const updated = await col.findOne({ id: existing.id });
+          upserted.push(updated);
         } else {
           const newItem = {
-            id: item.id || Math.random().toString(36).substring(2, 9),
+            id: itemCopy.id || Math.random().toString(36).substring(2, 9),
             created_at: new Date().toISOString(),
-            ...item
+            ...itemCopy
           };
-          currentList.push(newItem);
+          await col.insertOne(newItem);
           upserted.push(newItem);
         }
       }
 
-      writeDb(db);
       return NextResponse.json({ data: upserted });
     }
 
     if (action === 'delete') {
-      let targetIds: string[] = [];
+      let targetQuery: any = {};
 
       if (id) {
-        targetIds = [id];
+        targetQuery.id = id;
       } else if (filters && Array.isArray(filters)) {
-        let matching = [...records];
         for (const filter of filters) {
           const { column, op, value } = filter;
           if (op === 'eq') {
-            matching = matching.filter((r: any) => r[column] === value);
+            targetQuery[column] = value;
           }
         }
-        targetIds = matching.map((m: any) => m.id);
       }
 
-      db[table as keyof DbSchema] = db[table as keyof DbSchema].filter((r: any) => !targetIds.includes(r.id));
-      writeDb(db);
-      return NextResponse.json({ data: { success: true, count: targetIds.length } });
+      const deleteResult = await col.deleteMany(targetQuery);
+      return NextResponse.json({ data: { success: true, count: deleteResult.deletedCount } });
     }
 
     return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });

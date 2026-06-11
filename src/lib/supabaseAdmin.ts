@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { readDb, writeDb, DbSchema } from '@/lib/mockDb';
+import { getDb } from '@/lib/mongodb';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key';
 
-const isMockMode = 
-  supabaseUrl.includes('placeholder-project.supabase.co') || 
-  supabaseServiceKey === 'placeholder-service-key';
+// In MongoDB database mode, we force the query runner to run queries locally on Mongo 
+// instead of fetching online Supabase cloud tables.
+const isMockMode = true; 
 
 class MockAdminQueryBuilder {
   private table: string;
@@ -113,184 +113,204 @@ class MockAdminQueryBuilder {
   }
 
   private async execute() {
-    const db = readDb();
-    const currentList = db[this.table as keyof DbSchema];
+    try {
+      const mongoDb = await getDb();
+      const col = mongoDb.collection(this.table);
 
-    if (this.action === 'insert') {
-      const recordsToInsert = Array.isArray(this.dataObj) ? this.dataObj : [this.dataObj];
-      const inserted: any[] = [];
+      if (this.action === 'insert') {
+        const recordsToInsert = Array.isArray(this.dataObj) ? this.dataObj : [this.dataObj];
+        const inserted: any[] = [];
 
-      for (const item of recordsToInsert) {
-        const newRecord = {
-          id: item.id || Math.random().toString(36).substring(2, 9),
-          created_at: new Date().toISOString(),
-          ...item
-        };
-        currentList.push(newRecord);
-        inserted.push(newRecord);
-
-        // Auto create wallet trigger simulation for providers
-        if (this.table === 'users' && newRecord.role === 'provider') {
-          const hasWallet = db.wallets.some(w => w.provider_id === newRecord.id);
-          if (!hasWallet) {
-            db.wallets.push({
-              id: `wallet-${newRecord.id}`,
-              provider_id: newRecord.id,
-              balance: 0.00,
-              held_amount: 0.00,
-              available_amount: 0.00
-            });
-          }
-        }
-      }
-
-      writeDb(db);
-      return { data: Array.isArray(this.dataObj) ? inserted : inserted, error: null };
-    }
-
-    if (this.action === 'update') {
-      let targetIds: string[] = [];
-      if (this.idVal) {
-        targetIds = [this.idVal];
-      } else {
-        let matching = [...currentList];
-        for (const filter of this.filters) {
-          const { column, op, value } = filter;
-          if (op === 'eq') matching = matching.filter((r: any) => r[column] === value);
-        }
-        targetIds = matching.map((m: any) => m.id);
-      }
-
-      const updatedList: any[] = [];
-      for (let i = 0; i < currentList.length; i++) {
-        if (targetIds.includes(currentList[i].id)) {
-          currentList[i] = { ...currentList[i], ...this.dataObj };
-          updatedList.push(currentList[i]);
-        }
-      }
-
-      writeDb(db);
-      return { data: updatedList, error: null };
-    }
-
-    if (this.action === 'upsert') {
-      const upsertItems = Array.isArray(this.dataObj) ? this.dataObj : [this.dataObj];
-      const upserted: any[] = [];
-
-      for (const item of upsertItems) {
-        let existingIndex = -1;
-        if (this.onConflictCol) {
-          existingIndex = currentList.findIndex((r: any) => r[this.onConflictCol!] === item[this.onConflictCol!]);
-        } else if (item.id) {
-          existingIndex = currentList.findIndex((r: any) => r.id === item.id);
-        }
-
-        if (existingIndex !== -1) {
-          currentList[existingIndex] = { ...currentList[existingIndex], ...item };
-          upserted.push(currentList[existingIndex]);
-        } else {
-          const newItem = {
+        for (const item of recordsToInsert) {
+          const newRecord = {
             id: item.id || Math.random().toString(36).substring(2, 9),
             created_at: new Date().toISOString(),
             ...item
           };
-          currentList.push(newItem);
-          upserted.push(newItem);
+          inserted.push(newRecord);
         }
+
+        await col.insertMany(inserted);
+
+        // Auto create wallet trigger simulation for providers
+        for (const newRecord of inserted) {
+          if (this.table === 'users' && newRecord.role === 'provider') {
+            const hasWallet = await mongoDb.collection('wallets').findOne({ provider_id: newRecord.id });
+            if (!hasWallet) {
+              await mongoDb.collection('wallets').insertOne({
+                id: `wallet-${newRecord.id}`,
+                provider_id: newRecord.id,
+                balance: 0.00,
+                held_amount: 0.00,
+                available_amount: 0.00
+              });
+            }
+          }
+        }
+
+        return { data: inserted, error: null };
       }
 
-      writeDb(db);
-      return { data: upserted, error: null };
-    }
+      if (this.action === 'update') {
+        let targetQuery: any = {};
+        if (this.idVal) {
+          targetQuery.id = this.idVal;
+        } else {
+          for (const filter of this.filters) {
+            const { column, op, value } = filter;
+            if (op === 'eq') targetQuery[column] = value;
+          }
+        }
 
-    if (this.action === 'delete') {
-      let targetIds: string[] = [];
+        const items = await col.find(targetQuery).toArray();
+        const ids = items.map(i => i.id);
+
+        await col.updateMany(
+          { id: { $in: ids } },
+          { $set: this.dataObj }
+        );
+
+        const updatedList = await col.find({ id: { $in: ids } }).toArray();
+        return { data: updatedList, error: null };
+      }
+
+      if (this.action === 'upsert') {
+        const upsertItems = Array.isArray(this.dataObj) ? this.dataObj : [this.dataObj];
+        const upserted: any[] = [];
+
+        for (const item of upsertItems) {
+          let query: any = {};
+          if (this.onConflictCol) {
+            const cols = this.onConflictCol.split(',').map((c: string) => c.trim());
+            cols.forEach((col: string) => {
+              query[col] = item[col];
+            });
+          } else if (item.id) {
+            query.id = item.id;
+          }
+
+          const existing = await col.findOne(query);
+
+          if (existing) {
+            await col.updateOne(
+              { id: existing.id },
+              { $set: item }
+            );
+            const updated = await col.findOne({ id: existing.id });
+            upserted.push(updated);
+          } else {
+            const newItem = {
+              id: item.id || Math.random().toString(36).substring(2, 9),
+              created_at: new Date().toISOString(),
+              ...item
+            };
+            await col.insertOne(newItem);
+            upserted.push(newItem);
+          }
+        }
+
+        return { data: upserted, error: null };
+      }
+
+      if (this.action === 'delete') {
+        let targetQuery: any = {};
+        if (this.idVal) {
+          targetQuery.id = this.idVal;
+        } else {
+          for (const filter of this.filters) {
+            const { column, op, value } = filter;
+            if (op === 'eq') targetQuery[column] = value;
+          }
+        }
+
+        const deleteResult = await col.deleteMany(targetQuery);
+        return { data: { success: true, count: deleteResult.deletedCount }, error: null };
+      }
+
+      // Default: select operation
+      const query: any = {};
       if (this.idVal) {
-        targetIds = [this.idVal];
-      } else {
-        let matching = [...currentList];
-        for (const filter of this.filters) {
-          const { column, op, value } = filter;
-          if (op === 'eq') matching = matching.filter((r: any) => r[column] === value);
+        query.id = this.idVal;
+      }
+
+      for (const filter of this.filters) {
+        const { column, op, value } = filter;
+        if (op === 'eq') {
+          query[column] = value;
+        } else if (op === 'neq') {
+          query[column] = { $ne: value };
+        } else if (op === 'in') {
+          query[column] = { $in: value };
+        } else if (op === 'lt') {
+          query[column] = { $lt: value };
         }
-        targetIds = matching.map((m: any) => m.id);
       }
 
-      db[this.table as keyof DbSchema] = currentList.filter((r: any) => !targetIds.includes(r.id));
-      writeDb(db);
-      return { data: { success: true, count: targetIds.length }, error: null };
-    }
+      let cursor = col.find(query);
 
-    // Default: select operation
-    let records = [...currentList];
-
-    if (this.idVal) {
-      records = records.filter((r: any) => r.id === this.idVal);
-    }
-
-    for (const filter of this.filters) {
-      const { column, op, value } = filter;
-      if (op === 'eq') {
-        records = records.filter((r: any) => r[column] === value);
-      } else if (op === 'neq') {
-        records = records.filter((r: any) => r[column] !== value);
-      } else if (op === 'in') {
-        records = records.filter((r: any) => Array.isArray(value) && value.includes(r[column]));
-      } else if (op === 'lt') {
-        records = records.filter((r: any) => r[column] < value);
+      if (this.orderObj) {
+        const { column, ascending } = this.orderObj;
+        cursor = cursor.sort({ [column]: ascending ? 1 : -1 });
       }
-    }
 
-    // Sorting
-    if (this.orderObj) {
-      const { column, ascending } = this.orderObj;
-      records.sort((a: any, b: any) => {
-        const valA = a[column];
-        const valB = b[column];
-        if (valA === undefined || valA === null) return 1;
-        if (valB === undefined || valB === null) return -1;
-        if (typeof valA === 'string' && typeof valB === 'string') {
-          return ascending ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      if (this.limitVal !== null && this.limitVal !== undefined) {
+        cursor = cursor.limit(this.limitVal);
+      }
+
+      const records = await cursor.toArray();
+
+      // Resolve JOINS
+      if (records.length > 0) {
+        if (this.table === 'service_requests') {
+          const catIds = records.map(r => r.category_id).filter(Boolean);
+          const custIds = records.map(r => r.customer_id).filter(Boolean);
+          const reqIds = records.map(r => r.id).filter(Boolean);
+
+          const categories = await mongoDb.collection('service_categories').find({ id: { $in: catIds } }).toArray();
+          const customers = await mongoDb.collection('users').find({ id: { $in: custIds } }).toArray();
+          const images = await mongoDb.collection('request_images').find({ request_id: { $in: reqIds } }).toArray();
+          const accepts = await mongoDb.collection('provider_accepts').find({ request_id: { $in: reqIds }, status: 'ACCEPTED' }).toArray();
+
+          for (const record of records) {
+            record.category = categories.find(c => c.id === record.category_id) || null;
+            record.customer = customers.find(c => c.id === record.customer_id) || null;
+            record.request_images = images.filter(img => img.request_id === record.id);
+            const count = accepts.filter(a => a.request_id === record.id).length;
+            record.provider_accepts = [{ count }];
+          }
         }
-        if (valA < valB) return ascending ? -1 : 1;
-        if (valA > valB) return ascending ? 1 : -1;
-        return 0;
-      });
-    }
 
-    // Limit Slicing
-    if (this.limitVal !== null && this.limitVal !== undefined) {
-      records = records.slice(0, this.limitVal);
-    }
+        if (this.table === 'orders') {
+          const reqIds = records.map(r => r.request_id).filter(Boolean);
+          const custIds = records.map(r => r.customer_id).filter(Boolean);
+          const provIds = records.map(r => r.provider_id).filter(Boolean);
 
-    // Resolve JOINS
-    const resolvedRecords = records.map((record: any) => {
-      const copy = { ...record };
+          const requests = await mongoDb.collection('service_requests').find({ id: { $in: reqIds } }).toArray();
+          const customers = await mongoDb.collection('users').find({ id: { $in: custIds } }).toArray();
+          const providers = await mongoDb.collection('users').find({ id: { $in: provIds } }).toArray();
 
-      if (this.table === 'service_requests') {
-        copy.category = db.service_categories.find((c: any) => c.id === record.category_id);
-        copy.customer = db.users.find((u: any) => u.id === record.customer_id);
-        copy.request_images = db.request_images.filter((img: any) => img.request_id === record.id);
-        const count = db.provider_accepts.filter((a: any) => a.request_id === record.id && a.status === 'ACCEPTED').length;
-        copy.provider_accepts = [{ count }];
-      }
+          const catIds = requests.map(r => r.category_id).filter(Boolean);
+          const reqItemIds = requests.map(r => r.id).filter(Boolean);
+          const categories = await mongoDb.collection('service_categories').find({ id: { $in: catIds } }).toArray();
+          const images = await mongoDb.collection('request_images').find({ request_id: { $in: reqItemIds } }).toArray();
 
-      if (this.table === 'orders') {
-        const reqItem = db.service_requests.find((r: any) => r.id === record.request_id);
-        if (reqItem) {
-          const reqCopy = { ...reqItem };
-          reqCopy.category = db.service_categories.find((c: any) => c.id === reqItem.category_id);
-          reqCopy.request_images = db.request_images.filter((img: any) => img.request_id === reqItem.id);
-          copy.request = reqCopy;
+          for (const reqItem of requests) {
+            reqItem.category = categories.find(c => c.id === reqItem.category_id) || null;
+            reqItem.request_images = images.filter(img => img.request_id === reqItem.id);
+          }
+
+          for (const record of records) {
+            record.request = requests.find(r => r.id === record.request_id) || null;
+            record.customer = customers.find(u => u.id === record.customer_id) || null;
+            record.provider = providers.find(u => u.id === record.provider_id) || null;
+          }
         }
-        copy.customer = db.users.find((u: any) => u.id === record.customer_id);
-        copy.provider = db.users.find((u: any) => u.id === record.provider_id);
       }
 
-      return copy;
-    });
-
-    return { data: resolvedRecords, error: null };
+      return { data: records, error: null };
+    } catch (err: any) {
+      return { data: null, error: err };
+    }
   }
 }
 
