@@ -7,8 +7,11 @@ import { Wrench, Zap, Sparkles, Cpu, Paintbrush, Bug, CheckCircle, ArrowRight, S
 import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LandingPage() {
+  const { user, isAuthenticated } = useAuth();
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -64,19 +67,30 @@ export default function LandingPage() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.6 }}
-            className="mt-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
+            className="mt-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center"
           >
-            <Link href="/register" className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl font-bold bg-primary text-white hover:bg-primary-hover">
-                Get Started
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-            <Link href="/login" className="w-full sm:w-auto">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl border-border bg-card text-foreground hover:bg-muted font-bold">
-                Log In
-              </Button>
-            </Link>
+            {isAuthenticated && user ? (
+              <Link href={`/${user.role}`} className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl font-bold bg-primary text-white hover:bg-primary-hover">
+                  Go to Dashboard
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/register" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto rounded-xl shadow-lg hover:shadow-xl font-bold bg-primary text-white hover:bg-primary-hover">
+                    Get Started
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link href="/login" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl border-border bg-card text-foreground hover:bg-muted font-bold">
+                    Log In
+                  </Button>
+                </Link>
+              </>
+            )}
           </motion.div>
         </div>
       </section>

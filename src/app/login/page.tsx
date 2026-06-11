@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Lock, Phone, Mail, Eye, EyeOff, Search, AlertCircle, Loader2 } from 'lucide-react';
@@ -13,8 +13,14 @@ import { Navbar } from '@/components/layout/Navbar';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, isAuthenticated } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, router]);
   
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

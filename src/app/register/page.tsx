@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -14,8 +14,14 @@ import { Navbar } from '@/components/layout/Navbar';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register: registerUser, verifyOtp } = useAuth();
+  const { register: registerUser, verifyOtp, user, isAuthenticated } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      router.replace(`/${user.role}`);
+    }
+  }, [isAuthenticated, user, router]);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
