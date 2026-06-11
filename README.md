@@ -1,4 +1,4 @@
-# QuickFix - Local Service Marketplace Platform
+# QuickFix - Service Marketplace Platform
 
 QuickFix is a production-ready, premium service marketplace platform connecting customers with background-verified local service providers in real-time. Features include dynamic request creation, image uploads, browser-based geolocations, real-time accepted provider comparisons (hiding contact details), one-click matching, chat rooms, wallet ledger holds, disputes, and administrators panel.
 
