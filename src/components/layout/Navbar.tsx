@@ -87,7 +87,7 @@ export function Navbar() {
               )}
 
               {/* Profile Image / Initials */}
-              <div className="flex items-center gap-2">
+              <Link href="/account" className="flex items-center gap-2 hover:opacity-85 cursor-pointer">
                 {user.profileImage ? (
                   <img
                     src={user.profileImage}
@@ -102,7 +102,7 @@ export function Navbar() {
                 <span className="hidden md:inline text-sm font-semibold text-foreground">
                   {user.fullName.split(' ')[0]}
                 </span>
-              </div>
+              </Link>
 
               {/* Logout Button */}
               <Button 

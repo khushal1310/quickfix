@@ -80,8 +80,10 @@ export function BottomNav() {
 
         {/* Profile Settings */}
         <Link 
-          href={`/${role}#profile`} 
-          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors text-muted-foreground`}
+          href="/account" 
+          className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
+            pathname === '/account' ? 'text-primary' : 'text-muted-foreground'
+          }`}
         >
           {user.profileImage ? (
             <img 
