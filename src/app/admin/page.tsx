@@ -13,7 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   ShieldAlert, Users, Wrench, DollarSign, AlertTriangle, Loader2, 
-  Trash, Plus, Check, Ban, CheckCircle2, Sparkles, Search, Layers, RefreshCw
+  Trash, Plus, Check, Ban, CheckCircle2, Sparkles, Search, Layers, RefreshCw, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -241,8 +241,8 @@ export default function AdminPanel() {
 
           // Add credit & fee deduction txns
           await supabase.from('wallet_transactions').insert([
-            { wallet_id: wallet.id, type: 'Credit', amount: budget, description: `Job dispute payout earnings of $${budget}` },
-            { wallet_id: wallet.id, type: 'Fee Deduction', amount: platformFee, description: `Dispute platform fee deduction of $${platformFee}` }
+            { wallet_id: wallet.id, type: 'Credit', amount: budget, description: `Job dispute payout earnings of ₹${budget}` },
+            { wallet_id: wallet.id, type: 'Fee Deduction', amount: platformFee, description: `Dispute platform fee deduction of ₹${platformFee}` }
           ]);
         }
         toastSuccess('Dispute resolved: Provider paid.');
@@ -309,11 +309,21 @@ export default function AdminPanel() {
         {/* Header Title */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-black text-foreground flex items-center gap-2">
-              <ShieldAlert className="h-8 w-8 text-primary" />
-              Administrative Panel
-            </h1>
-            <p className="text-muted-foreground text-sm">System moderation, dispute overrides, and category configurations.</p>
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => router.push('/')} 
+                className="p-2 -ml-2 rounded-full hover:bg-muted text-foreground transition-all shrink-0"
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+              <h1 className="text-3xl font-black text-foreground flex items-center gap-2">
+                <ShieldAlert className="h-8 w-8 text-primary" />
+                Administrative Panel
+              </h1>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">System moderation, dispute overrides, and category configurations.</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={fetchAdminData} className="rounded-xl flex items-center gap-1">

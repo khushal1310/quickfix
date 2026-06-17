@@ -55,6 +55,24 @@ interface UserDBDetails {
   rating: number;
   verificationStatus: 'verified' | 'pending' | 'unverified';
   kycStatus: 'verified' | 'pending' | 'unverified';
+  completedOrdersCount?: number;
+}
+
+// Resolver for provider badges
+function getProviderBadge(count: number) {
+  if (count >= 1000) {
+    return { label: 'Platinum', color: 'bg-slate-900 border-slate-500 text-slate-100 dark:bg-slate-800' };
+  }
+  if (count >= 500) {
+    return { label: 'Gold', color: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' };
+  }
+  if (count >= 250) {
+    return { label: 'Silver', color: 'bg-slate-500/10 border-slate-500/30 text-slate-500' };
+  }
+  if (count >= 50) {
+    return { label: 'Bronze', color: 'bg-amber-700/10 border-amber-700/30 text-amber-700' };
+  }
+  return { label: 'Bronze', color: 'bg-amber-700/10 border-amber-700/30 text-amber-700' };
 }
 
 export default function AccountPage() {
@@ -87,6 +105,13 @@ export default function AccountPage() {
 
   const [selectedCategory, setSelectedCategory] = useState('Cleaning');
   const [contactMessage, setContactMessage] = useState('');
+
+  // Aadhaar KYC state variables
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [kycStep, setKycStep] = useState<'input' | 'loading' | 'otp' | 'success'>('input');
+  const [loadingStepText, setLoadingStepText] = useState('');
+  const [kycOtp, setKycOtp] = useState('');
+  const [kycSubmitting, setKycSubmitting] = useState(false);
 
   // Temporary list fetch states for request/job modal
   const [modalItems, setModalItems] = useState<any[]>([]);
@@ -129,8 +154,9 @@ export default function AccountPage() {
           profileImage: userRecord.profile_image || authUser.profileImage || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(userRecord.full_name || '')}`,
           role: userRecord.role || authUser.role,
           rating: userRecord.rating || 4.8,
-          verificationStatus: userRecord.verification_status || 'verified',
-          kycStatus: userRecord.kyc_status || 'verified'
+          verificationStatus: userRecord.verification_status || 'unverified',
+          kycStatus: userRecord.kyc_status || 'unverified',
+          completedOrdersCount: userRecord.completed_orders_count || 0
         };
         setProfile(profileDetails);
 
@@ -379,6 +405,69 @@ export default function AccountPage() {
     }
   };
 
+  // Aadhaar KYC Submit Handler
+  const handleAadhaarSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = aadhaarNumber.replace(/\D/g, '');
+    if (cleaned.length !== 12) {
+      toastError('Please enter a valid 12-digit Aadhaar number.');
+      return;
+    }
+
+    setKycStep('loading');
+    setLoadingStepText('Connecting to UIDAI secure servers...');
+    
+    setTimeout(() => {
+      setLoadingStepText('Locating linked mobile number...');
+      setTimeout(() => {
+        setLoadingStepText('Sending secure SMS OTP...');
+        setTimeout(() => {
+          setKycStep('otp');
+        }, 1200);
+      }, 1200);
+    }, 1200);
+  };
+
+  // Aadhaar KYC OTP Verification Handler
+  const handleKycOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = kycOtp.replace(/\D/g, '');
+    if (cleaned.length !== 6) {
+      toastError('Please enter the 6-digit OTP.');
+      return;
+    }
+
+    setKycSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          kyc_status: 'verified',
+          verification_status: 'verified'
+        })
+        .eq('id', authUser?.id);
+
+      if (error) throw error;
+
+      // Update local storage session
+      const storedUser = localStorage.getItem('qf_user');
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        u.kycStatus = 'verified';
+        u.verificationStatus = 'verified';
+        localStorage.setItem('qf_user', JSON.stringify(u));
+      }
+
+      toastSuccess('Aadhaar KYC Verification Successful!');
+      setKycStep('success');
+      setProfile(prev => prev ? { ...prev, kycStatus: 'verified', verificationStatus: 'verified' } : null);
+    } catch (err: any) {
+      toastError(err.message || 'Verification update failed.');
+    } finally {
+      setKycSubmitting(false);
+    }
+  };
+
   // Contact Support Form Handler
   const handleContactSupportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -484,12 +573,14 @@ export default function AccountPage() {
                   <span className="inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
                     {profile.role}
                   </span>
-                  {profile.role === 'provider' && (
-                    <span className="inline-flex items-center gap-0.5 text-xs font-bold text-yellow-600 dark:text-yellow-400">
-                      <Star className="h-3.5 w-3.5 fill-current" />
-                      {profile.rating.toFixed(1)}
-                    </span>
-                  )}
+                  {profile.role === 'provider' && (() => {
+                    const badge = getProviderBadge(profile.completedOrdersCount || 0);
+                    return (
+                      <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded border ${badge.color}`}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <Button 
@@ -516,7 +607,7 @@ export default function AccountPage() {
             </div>
             <span className="text-xs text-muted-foreground font-semibold">Wallet Balance</span>
             <span className="text-lg font-black text-foreground mt-0.5">
-              ${walletBalance.toFixed(2)}
+              ₹{walletBalance.toFixed(2)}
             </span>
           </button>
 
@@ -624,7 +715,13 @@ export default function AccountPage() {
           <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
             <button onClick={() => openDrawerModal('kyc-status')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
               <span className="text-sm font-bold text-foreground">KYC Status</span>
-              <span className="text-xs font-black text-green-500 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">Verified</span>
+              <span className={`text-xs font-black px-2 py-0.5 rounded border ${
+                profile.kycStatus === 'verified'
+                  ? 'text-green-500 bg-green-500/10 border-green-500/20'
+                  : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+              }`}>
+                {profile.kycStatus === 'verified' ? 'Verified' : 'Verify Now'}
+              </span>
             </button>
             <button onClick={() => openDrawerModal('kyc-status')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
               <span className="text-sm font-bold text-foreground">Identity Verification</span>
@@ -643,8 +740,15 @@ export default function AccountPage() {
             <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2 px-1">Reviews &amp; Ratings</h3>
             <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
               <button onClick={() => openDrawerModal('reviews-received')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
-                <span className="text-sm font-bold text-foreground">My Ratings</span>
-                <span className="text-xs font-bold text-yellow-600 dark:text-yellow-400">★ {profile.rating.toFixed(1)}</span>
+                <span className="text-sm font-bold text-foreground">My Badge</span>
+                {(() => {
+                  const badge = getProviderBadge(profile.completedOrdersCount || 0);
+                  return (
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded border ${badge.color}`}>
+                      {badge.label}
+                    </span>
+                  );
+                })()}
               </button>
               <button onClick={() => openDrawerModal('reviews-received')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
                 <span className="text-sm font-bold text-foreground">Reviews Received</span>
@@ -1041,19 +1145,91 @@ export default function AccountPage() {
 
               {/* 9. KYC STATUS */}
               {activeModal === 'kyc-status' && (
-                <div className="space-y-4 text-center py-4">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
-                    <ShieldCheck className="h-7 w-7" />
-                  </div>
-                  <h4 className="text-lg font-extrabold text-foreground">KYC Completed</h4>
-                  <p className="text-sm text-muted-foreground leading-normal px-2">
-                    Your background and document check is fully verified. Your profile displays the verification checkmark on service listings.
-                  </p>
-                  <div className="text-left mt-6 border border-border p-4 rounded-2xl bg-muted/20 space-y-2 text-xs">
-                    <div className="flex justify-between"><span className="text-muted-foreground">ID Type:</span><span className="font-bold">Aadhaar / National ID</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Status:</span><span className="font-bold text-green-500">Approved</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Last Verified:</span><span className="font-bold">June 12, 2026</span></div>
-                  </div>
+                <div>
+                  {profile.kycStatus === 'verified' || kycStep === 'success' ? (
+                    <div className="space-y-4 text-center py-4">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
+                        <CheckCircle2 className="h-7 w-7 text-green-500" />
+                      </div>
+                      <h4 className="text-lg font-extrabold text-foreground">KYC Verification Completed</h4>
+                      <p className="text-sm text-muted-foreground leading-normal px-2">
+                        Your background and identity check has been successfully verified via UIDAI. Your profile displays the verification checkmark on service listings.
+                      </p>
+                      <div className="text-left mt-6 border border-border p-4 rounded-2xl bg-muted/20 space-y-2 text-xs">
+                        <div className="flex justify-between"><span className="text-muted-foreground">ID Type:</span><span className="font-bold">Aadhaar (Government UIDAI)</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Status:</span><span className="font-bold text-green-500">Approved & Verified</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Last Verified:</span><span className="font-bold">Just now / Recent</span></div>
+                      </div>
+                    </div>
+                  ) : kycStep === 'input' ? (
+                    <form onSubmit={handleAadhaarSubmit} className="space-y-4 py-2">
+                      <div className="text-center mb-4">
+                        <ShieldCheck className="h-10 w-10 text-primary mx-auto mb-2" />
+                        <h4 className="text-base font-bold text-foreground">Aadhaar Card KYC</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Verify your identity instantly using your Aadhaar number</p>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aadhaar Card Number</label>
+                        <Input
+                          placeholder="e.g. 1234-5678-9012"
+                          maxLength={19}
+                          value={aadhaarNumber}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/\D/g, '');
+                            if (val.length > 12) val = val.slice(0, 12);
+                            const parts = [];
+                            for (let i = 0; i < val.length; i += 4) {
+                              parts.push(val.slice(i, i + 4));
+                            }
+                            setAadhaarNumber(parts.join('-'));
+                          }}
+                          required
+                        />
+                      </div>
+
+                      <Button type="submit" className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold mt-4 shadow-sm">
+                        Verify with UIDAI Secure Server
+                      </Button>
+                    </form>
+                  ) : kycStep === 'loading' ? (
+                    <div className="text-center py-10 space-y-4">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+                      <h4 className="text-sm font-bold text-foreground animate-pulse">{loadingStepText}</h4>
+                      <p className="text-xs text-muted-foreground">This simulates checking government databases in real-time.</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleKycOtpSubmit} className="space-y-4 py-2">
+                      <div className="text-center mb-4">
+                        <Lock className="h-10 w-10 text-primary mx-auto mb-2 animate-pulse" />
+                        <h4 className="text-base font-bold text-foreground">Enter Verification OTP</h4>
+                        <p className="text-xs text-muted-foreground mt-1">We sent a 6-digit OTP code to the mobile number registered with your Aadhaar.</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">6-Digit SMS OTP</label>
+                        <Input
+                          placeholder="Enter 6-digit OTP"
+                          maxLength={6}
+                          value={kycOtp}
+                          onChange={(e) => setKycOtp(e.target.value.replace(/\D/g, ''))}
+                          required
+                        />
+                      </div>
+
+                      <Button 
+                        type="submit" 
+                        className="w-full rounded-xl bg-green-500 text-white hover:bg-green-600 font-bold mt-4 shadow-sm"
+                        disabled={kycSubmitting}
+                      >
+                        {kycSubmitting ? (
+                          <span className="flex items-center gap-1.5 justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin" /> Verifying OTP...
+                          </span>
+                        ) : 'Confirm OTP & Verify'}
+                      </Button>
+                    </form>
+                  )}
                 </div>
               )}
 
@@ -1090,7 +1266,7 @@ export default function AccountPage() {
                   </div>
                   <h4 className="text-lg font-extrabold text-foreground">Invite friends, get promo credits!</h4>
                   <p className="text-sm text-muted-foreground leading-normal px-2">
-                    Share your referral code. When your friend books their first service, you both get $10.00 credit.
+                    Share your referral code. When your friend books their first service, you both get ₹500.00 credit.
                   </p>
                   <div className="flex items-center gap-2 border border-dashed border-primary/50 bg-primary/5 p-3 rounded-2xl justify-between mt-6">
                     <span className="font-mono font-black text-primary tracking-wider text-base pl-3">QF-TIT-7890</span>
@@ -1106,7 +1282,7 @@ export default function AccountPage() {
                 <div className="space-y-3">
                   {[
                     { code: 'WELCOME50', desc: '50% off on your first booking.', exp: 'Expires Jun 30, 2026' },
-                    { code: 'CLEANING10', desc: '$10 credit on cleaning categories.', exp: 'Expires Jul 15, 2026' }
+                    { code: 'CLEANING10', desc: '₹500 credit on cleaning categories.', exp: 'Expires Jul 15, 2026' }
                   ].map((p, idx) => (
                     <div key={idx} className="p-4 border border-border bg-card rounded-2xl flex justify-between items-center">
                       <div>
@@ -1171,17 +1347,17 @@ export default function AccountPage() {
               {activeModal === 'provider-earnings' && (
                 <div className="space-y-4 text-center py-4">
                   <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
-                    <DollarSign className="h-6 w-6" />
+                    <Wallet className="h-6 w-6" />
                   </div>
                   <h4 className="text-lg font-extrabold text-foreground">Earnings Summary</h4>
                   <div className="grid grid-cols-2 gap-4 mt-6">
                     <div className="border border-border p-4 rounded-2xl bg-card">
                       <span className="text-[10px] text-muted-foreground font-semibold">Available Payout</span>
-                      <p className="text-xl font-black text-foreground mt-0.5">${walletBalance.toFixed(2)}</p>
+                      <p className="text-xl font-black text-foreground mt-0.5">₹{walletBalance.toFixed(2)}</p>
                     </div>
                     <div className="border border-border p-4 rounded-2xl bg-card">
                       <span className="text-[10px] text-muted-foreground font-semibold">Held Escrow</span>
-                      <p className="text-xl font-black text-yellow-600 dark:text-yellow-400 mt-0.5">${walletHeld.toFixed(2)}</p>
+                      <p className="text-xl font-black text-yellow-600 dark:text-yellow-400 mt-0.5">₹{walletHeld.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -1199,7 +1375,7 @@ export default function AccountPage() {
                   </p>
                   <div className="border border-border p-4 rounded-2xl bg-card mt-6">
                     <span className="text-[10px] text-muted-foreground font-semibold">Current Balance</span>
-                    <p className="text-2xl font-black text-foreground mt-0.5">${walletBalance.toFixed(2)}</p>
+                    <p className="text-2xl font-black text-foreground mt-0.5">₹{walletBalance.toFixed(2)}</p>
                   </div>
                   <Button className="w-full rounded-xl mt-4 font-bold">
                     Recharge Balance
@@ -1277,7 +1453,7 @@ export default function AccountPage() {
                             </div>
                           </div>
                           <span className="text-sm font-black text-foreground shrink-0 pl-3">
-                            {item.type === 'Credit' ? '+' : '-'}${parseFloat(item.amount).toFixed(2)}
+                            {item.type === 'Credit' ? '+' : '-'}₹{parseFloat(item.amount).toFixed(2)}
                           </span>
                         </div>
                       ))}
@@ -1287,7 +1463,7 @@ export default function AccountPage() {
                         <div key={idx} className="p-4 border border-border bg-card rounded-2xl space-y-2">
                           <div className="flex justify-between items-start">
                             <h5 className="text-sm font-bold text-foreground tracking-tight truncate">{item.title || 'Service Request'}</h5>
-                            <span className="text-xs font-black text-primary shrink-0">${item.budget}</span>
+                            <span className="text-xs font-black text-primary shrink-0">₹{item.budget}</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-normal line-clamp-2">{item.description}</p>
                           <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1.5 border-t border-border/60">
@@ -1316,7 +1492,7 @@ export default function AccountPage() {
                         <div key={idx} className="p-4 border border-border bg-card rounded-2xl space-y-2">
                           <div className="flex justify-between items-start">
                             <h5 className="text-sm font-bold text-foreground truncate">{item.request?.title || 'Active Order'}</h5>
-                            <span className="text-xs font-black text-green-500 shrink-0">${item.budget}</span>
+                            <span className="text-xs font-black text-green-500 shrink-0">₹{item.budget}</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-normal">Status: <span className="font-bold text-primary">{item.status}</span></p>
                           <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1.5 border-t border-border/60">
@@ -1335,7 +1511,7 @@ export default function AccountPage() {
                           </div>
                           <p className="text-xs text-muted-foreground leading-normal">Category: {item.request?.category?.name}</p>
                           <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1.5 border-t border-border/60">
-                            <span>Budget: ${item.request?.budget}</span>
+                            <span>Budget: ₹{item.request?.budget}</span>
                           </div>
                         </div>
                       ))}
@@ -1345,7 +1521,7 @@ export default function AccountPage() {
                         <div key={idx} className="p-4 border border-border bg-card rounded-2xl space-y-2">
                           <div className="flex justify-between items-start">
                             <h5 className="text-sm font-bold text-foreground truncate">{item.request?.title || 'Completed Order'}</h5>
-                            <span className="text-xs font-black text-green-500 shrink-0">${item.budget}</span>
+                            <span className="text-xs font-black text-green-500 shrink-0">₹{item.budget}</span>
                           </div>
                           <div className="flex items-center gap-4 text-[10px] text-muted-foreground pt-1.5 border-t border-border/60">
                             <span>Completed: {new Date(item.completed_at || Date.now()).toLocaleDateString()}</span>

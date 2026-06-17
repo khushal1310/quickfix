@@ -48,6 +48,11 @@ export async function POST(req: NextRequest) {
         mobile_number: tempUser.mobileNumber,
         password_hash: tempUser.passwordHash,
         profile_image: defaultAvatar,
+        service_category: tempUser.serviceCategory || null,
+        rating: tempUser.role === 'provider' ? 5.0 : null,
+        verification_status: tempUser.role === 'provider' ? 'unverified' : 'verified',
+        kyc_status: tempUser.role === 'provider' ? 'unverified' : 'verified',
+        completed_orders_count: tempUser.role === 'provider' ? 0 : 0
       })
       .select('*')
       .single();
@@ -80,11 +85,19 @@ export async function POST(req: NextRequest) {
       createdAt: newUser.created_at,
     };
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       user,
     });
+
+    response.cookies.set('qf_token', token, {
+      path: '/',
+      maxAge: 2592000,
+      sameSite: 'strict',
+    });
+
+    return response;
   } catch (error: any) {
     console.error('Verify OTP API Error:', error);
     return NextResponse.json({ error: error.message || 'Server error during OTP verification.' }, { status: 500 });

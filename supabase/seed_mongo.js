@@ -73,6 +73,10 @@ const defaultUsers = [
     is_suspended: false,
     created_at: new Date().toISOString(),
     addresses: [],
+    latitude: 23.0225,
+    longitude: 72.5714,
+    verification_status: 'verified',
+    kyc_status: 'verified'
   },
   {
     id: 'customer-1',
@@ -88,6 +92,10 @@ const defaultUsers = [
       { id: 'addr-1', label: 'Home', area: 'A-402 Shrinand Nagar, Sector 21', city: 'Gandhinagar' },
       { id: 'addr-2', label: 'Work', area: 'GIFT City, Tower II, Block C', city: 'Gandhinagar' }
     ],
+    latitude: 23.0225,
+    longitude: 72.5714,
+    verification_status: 'verified',
+    kyc_status: 'verified'
   },
   {
     id: 'provider-1',
@@ -100,17 +108,102 @@ const defaultUsers = [
     is_suspended: false,
     created_at: new Date().toISOString(),
     addresses: [],
+    service_category: 'Cleaning',
+    rating: 4.8,
+    latitude: 23.0240,
+    longitude: 72.5720,
+    verification_status: 'verified',
+    kyc_status: 'verified',
+    completed_orders_count: 65 // Bronze badge
   },
+  {
+    id: 'provider-2',
+    role: 'provider',
+    full_name: 'Charlie Silver',
+    mobile_number: '3333333333',
+    email: 'charlie@quickfix.com',
+    password_hash: passwordHash,
+    profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Charlie',
+    is_suspended: false,
+    created_at: new Date().toISOString(),
+    addresses: [],
+    service_category: 'Cleaning',
+    rating: 4.9,
+    latitude: 23.0250,
+    longitude: 72.5730,
+    verification_status: 'verified',
+    kyc_status: 'verified',
+    completed_orders_count: 275 // Silver badge
+  },
+  {
+    id: 'provider-3',
+    role: 'provider',
+    full_name: 'Daniel Gold',
+    mobile_number: '4444444444',
+    email: 'daniel@quickfix.com',
+    password_hash: passwordHash,
+    profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Daniel',
+    is_suspended: false,
+    created_at: new Date().toISOString(),
+    addresses: [],
+    service_category: 'Cleaning',
+    rating: 5.0,
+    latitude: 23.0210,
+    longitude: 72.5700,
+    verification_status: 'verified',
+    kyc_status: 'verified',
+    completed_orders_count: 530 // Gold badge
+  },
+  {
+    id: 'provider-4',
+    role: 'provider',
+    full_name: 'Edward Platinum',
+    mobile_number: '5555555555',
+    email: 'edward@quickfix.com',
+    password_hash: passwordHash,
+    profile_image: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Edward',
+    is_suspended: false,
+    created_at: new Date().toISOString(),
+    addresses: [],
+    service_category: 'Cleaning',
+    rating: 4.7,
+    latitude: 23.0270,
+    longitude: 72.5740,
+    verification_status: 'verified',
+    kyc_status: 'verified',
+    completed_orders_count: 1050 // Platinum badge
+  }
 ];
 
 const defaultWallets = [
   {
     id: 'wallet-bob',
     provider_id: 'provider-1',
-    balance: 0.00,
+    balance: 1500.00,
     held_amount: 0.00,
-    available_amount: 0.00,
+    available_amount: 1500.00,
   },
+  {
+    id: 'wallet-charlie',
+    provider_id: 'provider-2',
+    balance: 2500.00,
+    held_amount: 0.00,
+    available_amount: 2500.00,
+  },
+  {
+    id: 'wallet-daniel',
+    provider_id: 'provider-3',
+    balance: 3500.00,
+    held_amount: 0.00,
+    available_amount: 3500.00,
+  },
+  {
+    id: 'wallet-edward',
+    provider_id: 'provider-4',
+    balance: 5500.00,
+    held_amount: 0.00,
+    available_amount: 5500.00,
+  }
 ];
 
 async function seed() {

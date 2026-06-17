@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
             wallet_id: wallet.id,
             type: 'Credit',
             amount: budget,
-            description: `Job autocomplete earnings of $${budget} for Order ID: ${order.id.slice(0, 8)}`,
+            description: `Job autocomplete earnings of ₹${budget} for Order ID: ${order.id.slice(0, 8)}`,
           });
 
           // Record Fee Deduction Transaction
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
             wallet_id: wallet.id,
             type: 'Fee Deduction',
             amount: platformFee,
-            description: `Autocomplete platform fee deduction of $${platformFee} for Order ID: ${order.id.slice(0, 8)}`,
+            description: `Autocomplete platform fee deduction of ₹${platformFee} for Order ID: ${order.id.slice(0, 8)}`,
           });
         }
       }

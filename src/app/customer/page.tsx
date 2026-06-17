@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   Sparkles, Wrench, Zap, Cpu, Paintbrush, Bug, 
   MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History,
-  Home, Briefcase
+  Home, Briefcase, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -23,6 +23,76 @@ interface Category {
   id: string;
   name: string;
   icon: string;
+}
+
+// Resolver for provider badges
+function getProviderBadge(count: number) {
+  if (count >= 1000) {
+    return { label: 'Platinum', color: 'bg-slate-900 border-slate-500 text-slate-100 dark:bg-slate-800' };
+  }
+  if (count >= 500) {
+    return { label: 'Gold', color: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' };
+  }
+  if (count >= 250) {
+    return { label: 'Silver', color: 'bg-slate-500/10 border-slate-500/30 text-slate-500' };
+  }
+  if (count >= 50) {
+    return { label: 'Bronze', color: 'bg-amber-700/10 border-amber-700/30 text-amber-700' };
+  }
+  return null;
+}
+
+// Live tracking simulator component
+function LiveTrackingSimulator({ order }: { order: any }) {
+  const startTime = new Date(order.created_at || order.started_at || new Date()).getTime();
+  const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+  
+  // ETA starts at 5 minutes (300 seconds) and counts down
+  const totalTripSec = 300; 
+  const remainingSec = Math.max(0, totalTripSec - elapsedSec);
+  const etaMin = Math.floor(remainingSec / 60);
+  const etaSec = remainingSec % 60;
+  const etaStr = remainingSec > 0 ? `${etaMin}:${etaSec < 10 ? '0' : ''}${etaSec}` : 'Arrived';
+  
+  const progressPercent = Math.min(100, (elapsedSec / totalTripSec) * 100);
+  
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mt-4 space-y-3 shadow-xs">
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-black text-primary uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+          <span className="h-2 w-2 rounded-full bg-primary" />
+          Live Provider Tracking
+        </span>
+        <span className="text-xs font-bold text-foreground bg-background px-2.5 py-1 rounded-full border border-border shadow-xs">
+          ETA: <span className="font-mono text-primary font-black">{etaStr}</span>
+        </span>
+      </div>
+      
+      {/* Progress Scooter bar */}
+      <div className="relative h-6 bg-muted rounded-full overflow-hidden flex items-center px-1">
+        <div 
+          className="absolute inset-y-0 left-0 bg-primary/10 transition-all duration-1000"
+          style={{ width: `${progressPercent}%` }}
+        />
+        
+        {/* Sliding Scooter icon */}
+        <div 
+          className="absolute transition-all duration-1000 flex items-center gap-1 text-primary"
+          style={{ left: `calc(${progressPercent}% - 24px)` }}
+        >
+          <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24">
+            <path d="M19 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm-9 0c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm11.23-7.77c-.4-.4-.9-.63-1.46-.7L16 6h-3.5c-.83 0-1.5.67-1.5 1.5V9H7.82C7.4 7.84 6.3 7 5 7c-1.66 0-3 1.34-3 3 0 .42.09.82.25 1.18l2.22 4.44C4.85 16.32 5.86 17 7 17h1v1c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-1h2.24l2.12-4.24c.42-.84.42-1.84 0-2.68l-2.13-4.85z"/>
+          </svg>
+        </div>
+      </div>
+      <p className="text-[10px] text-muted-foreground font-semibold text-center mt-1">
+        {progressPercent < 30 ? 'Provider has accepted match and is preparing tools...' :
+         progressPercent < 75 ? 'Provider is driving towards your location...' :
+         progressPercent < 100 ? 'Provider is arriving in your street now...' :
+         'Provider has arrived!'}
+      </p>
+    </div>
+  );
 }
 
 export default function CustomerDashboard() {
@@ -63,6 +133,8 @@ export default function CustomerDashboard() {
   // Create Request Address Details states
   const [flatNo, setFlatNo] = useState('');
   const [landmark, setLandmark] = useState('');
+  const [reqLatitude, setReqLatitude] = useState<number | null>(null);
+  const [reqLongitude, setReqLongitude] = useState<number | null>(null);
 
   // Address Manager Add Form states
   const [mgrLabel, setMgrLabel] = useState('Home');
@@ -76,6 +148,20 @@ export default function CustomerDashboard() {
   const [activeRequests, setActiveRequests] = useState<any[]>([]);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [completedOrders, setCompletedOrders] = useState<any[]>([]);
+  
+  // Feedback Modal states
+  const [ratingOrder, setRatingOrder] = useState<any | null>(null);
+  const [ratingValue, setRatingValue] = useState<number>(5);
+  const [ratingComment, setRatingComment] = useState<string>('');
+  
+  // Dynamic tick for timers
+  const [timeTick, setTimeTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Selection Detail Dialog states
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
@@ -218,6 +304,8 @@ export default function CustomerDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        setReqLatitude(latitude);
+        setReqLongitude(longitude);
         try {
           // Query OpenStreetMap Nominatim for real-time reverse geocoding based on GPS coords
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`);
@@ -408,6 +496,8 @@ export default function CustomerDashboard() {
           city,
           budget: budget ? parseFloat(budget) : null,
           status: 'OPEN',
+          latitude: reqLatitude || 23.0225,
+          longitude: reqLongitude || 72.5714,
         })
         .select('*')
         .single();
@@ -487,8 +577,45 @@ export default function CustomerDashboard() {
   };
 
   // Confirm Completion
-  const handleConfirmCompletion = async (orderId: string) => {
-    if (!confirm('Are you sure the provider has completed this work satisfactorily? This will release their payment.')) return;
+  const handleConfirmCompletion = (orderId: string) => {
+    const order = activeOrders.find(o => o.id === orderId);
+    if (order) {
+      setRatingOrder(order);
+      setRatingValue(5);
+      setRatingComment('');
+    }
+  };
+
+  // Cancel Match (within 1 minute)
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to cancel this match? The request will be reopened for other providers.')) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/orders/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('qf_token')}`
+        },
+        body: JSON.stringify({ orderId })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toastSuccess('Match cancelled! Request reopened for other providers.');
+        fetchCustomerData();
+      } else {
+        toastError(data.error || 'Failed to cancel match.');
+      }
+    } catch (err: any) {
+      toastError(err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Submit Feedback & Complete Order
+  const submitFeedbackAndComplete = async (orderId: string, rating: number, comment: string) => {
     setLoading(true);
     try {
       const res = await fetch('/api/orders/complete', {
@@ -497,15 +624,16 @@ export default function CustomerDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('qf_token')}`
         },
-        body: JSON.stringify({ orderId, action: 'confirm' })
+        body: JSON.stringify({ orderId, action: 'confirm', rating, comment })
       });
       const data = await res.json();
 
       if (res.ok) {
-        toastSuccess('Order completed and funds released successfully!');
+        toastSuccess('Order completed, funds released, and feedback submitted successfully!');
+        setRatingOrder(null);
         fetchCustomerData();
       } else {
-        toastError(data.error || 'Failed to confirm order completion.');
+        toastError(data.error || 'Failed to complete order.');
       }
     } catch (err: any) {
       toastError(err.message || 'An error occurred.');
@@ -587,8 +715,18 @@ export default function CustomerDashboard() {
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-8 md:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-black text-foreground">Hello, {user.fullName}</h1>
-            <p className="text-muted-foreground text-sm">Need help at home? Hire matching helpers instantly.</p>
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => router.push('/')} 
+                className="p-2 -ml-2 rounded-full hover:bg-muted text-foreground transition-all shrink-0"
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+              <h1 className="text-3xl font-black text-foreground">Hello, {user.fullName}</h1>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">Need help at home? Hire matching helpers instantly.</p>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -869,7 +1007,7 @@ export default function CustomerDashboard() {
 
                     {/* Budget */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget (USD, Optional)</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget (₹, Optional)</label>
                       <Input
                         type="number"
                         placeholder="e.g. 150"
@@ -969,16 +1107,17 @@ export default function CustomerDashboard() {
                                 {req.budget ? formatCurrency(req.budget) : 'N/A'}
                               </span>
                             </div>
-                            <Button
-                              size="sm"
-                              className="rounded-lg font-bold bg-primary text-white"
-                              onClick={() => {
-                                setSelectedRequest(req);
-                                fetchAcceptancesForRequest(req.id);
-                              }}
-                            >
-                              View Accepts ({req.acceptsCount})
-                            </Button>
+                            {req.status === 'OPEN' || req.status === 'ACCEPTED' ? (
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary animate-pulse py-1">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Searching for nearby providers within 1km...
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 py-1">
+                                <Check className="h-3.5 w-3.5" />
+                                Matched
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -996,91 +1135,124 @@ export default function CustomerDashboard() {
 
                 {activeOrders.length === 0 ? (
                   <Card className="border-border bg-card p-8 text-center text-muted-foreground">
-                    <p className="text-sm">No active orders. Select an accepted provider from your requests above.</p>
+                    <p className="text-sm">No active orders. Your matching providers will appear here once accepted.</p>
                   </Card>
                 ) : (
                   <div className="space-y-4">
-                    {activeOrders.map((order) => (
-                      <Card key={order.id} className="border-border bg-card overflow-hidden">
-                        {/* Header details */}
-                        <div className="bg-muted/30 p-5 flex flex-wrap justify-between items-center gap-2 border-b border-border">
-                          <div>
-                            <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
-                            <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
-                              order.status === 'SELECTED' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                              order.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                              order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                              'bg-red-500/10 text-red-500 border-red-500/20'
-                            }`}>
-                              {order.status}
-                            </span>
-                          </div>
-                          <div className="flex gap-2">
-                            {/* Chat Button */}
-                            <Link href={`/chat/${order.id}`}>
-                              <Button size="sm" variant="outline" className="rounded-lg border-border text-foreground hover:bg-muted font-bold flex items-center gap-1.5">
-                                <MessageSquare className="h-4 w-4 text-primary" />
-                                Live Chat
-                              </Button>
-                            </Link>
+                    {activeOrders.map((order) => {
+                      const createdAtTime = new Date(order.created_at).getTime();
+                      const elapsedSec = Math.floor((Date.now() - createdAtTime) / 1000);
+                      const remainingSec = Math.max(0, 60 - elapsedSec);
 
-                            {/* Confirm Completion */}
-                            {(order.status === 'COMPLETED' || order.status === 'IN_PROGRESS') && (
-                              <Button 
-                                size="sm" 
-                                className="rounded-lg bg-green-500 text-white hover:bg-green-600 font-bold flex items-center gap-1"
-                                onClick={() => handleConfirmCompletion(order.id)}
-                              >
-                                <Check className="h-4 w-4" />
-                                Confirm Completion
-                              </Button>
-                            )}
-
-                            {/* Raise Dispute */}
-                            {order.status !== 'DISPUTED' && order.status !== 'CANCELLED' && (
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="rounded-lg text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold flex items-center gap-1"
-                                onClick={() => setDisputeOrder(order)}
-                              >
-                                <AlertTriangle className="h-4 w-4" />
-                                Raise Dispute
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Order Body info */}
-                        <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                          {/* Provider Details (Revealed) */}
-                          <div className="flex items-center gap-4">
-                            <img
-                              src={order.provider?.profile_image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${order.provider?.full_name}`}
-                              alt={order.provider?.full_name}
-                              className="h-12 w-12 rounded-full border border-primary/20 object-cover"
-                            />
+                      return (
+                        <Card key={order.id} className="border-border bg-card overflow-hidden">
+                          {/* Header details */}
+                          <div className="bg-muted/30 p-5 flex flex-wrap justify-between items-center gap-2 border-b border-border">
                             <div>
-                              <h4 className="text-base font-bold text-foreground">{order.provider?.full_name}</h4>
-                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                                <span>{order.provider?.role === 'provider' ? 'Professional' : 'Partner'}</span>
-                                <span className="text-border">|</span>
-                                <Phone className="h-3 w-3 text-green-500" />
-                                <span className="font-bold text-green-600 select-all">{order.provider?.mobile_number}</span>
-                              </div>
+                              <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
+                              <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
+                                order.status === 'SELECTED' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                order.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                'bg-red-500/10 text-red-500 border-red-500/20'
+                              }`}>
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              {/* 1-Minute Cancellation */}
+                              {order.status === 'SELECTED' && remainingSec > 0 && (
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive" 
+                                  className="rounded-lg font-bold flex items-center gap-1 h-9 animate-pulse"
+                                  onClick={() => handleCancelOrder(order.id)}
+                                >
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Cancel Match ({remainingSec}s)
+                                </Button>
+                              )}
+
+                              {/* Chat Button */}
+                              <Link href={`/chat/${order.id}`}>
+                                <Button size="sm" variant="outline" className="rounded-lg border-border text-foreground hover:bg-muted font-bold flex items-center gap-1.5">
+                                  <MessageSquare className="h-4 w-4 text-primary" />
+                                  Live Chat
+                                </Button>
+                              </Link>
+
+                              {/* Confirm Completion */}
+                              {(order.status === 'COMPLETED' || order.status === 'IN_PROGRESS') && (
+                                <Button 
+                                  size="sm" 
+                                  className="rounded-lg bg-green-500 text-white hover:bg-green-600 font-bold flex items-center gap-1"
+                                  onClick={() => handleConfirmCompletion(order.id)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                  Confirm Completion
+                                </Button>
+                              )}
+
+                              {/* Raise Dispute */}
+                              {order.status !== 'DISPUTED' && order.status !== 'CANCELLED' && (
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className="rounded-lg text-red-500 hover:bg-red-500/10 hover:text-red-600 font-bold flex items-center gap-1"
+                                  onClick={() => setDisputeOrder(order)}
+                                >
+                                  <AlertTriangle className="h-4 w-4" />
+                                  Raise Dispute
+                                </Button>
+                              )}
                             </div>
                           </div>
 
-                          {/* Task summary */}
-                          <div className="text-left md:text-right">
-                            <span className="text-xs text-muted-foreground block">Job Details</span>
-                            <p className="text-sm font-semibold text-foreground line-clamp-1">{order.request?.description}</p>
-                            <span className="text-xs text-muted-foreground">{order.request?.area}, {order.request?.city}</span>
+                          {/* Order Body info */}
+                          <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            {/* Provider Details (Revealed) */}
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={order.provider?.profile_image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${order.provider?.full_name}`}
+                                alt={order.provider?.full_name}
+                                className="h-12 w-12 rounded-full border border-primary/20 object-cover"
+                              />
+                              <div>
+                                <h4 className="text-base font-bold text-foreground">{order.provider?.full_name}</h4>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  {(() => {
+                                    const badge = getProviderBadge(order.provider?.completed_orders_count || 0);
+                                    if (!badge) return null;
+                                    return (
+                                      <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded-md border ${badge.color}`}>
+                                        {badge.label}
+                                      </span>
+                                    );
+                                  })()}
+                                  <span className="text-border">|</span>
+                                  <Phone className="h-3 w-3 text-green-500" />
+                                  <span className="font-bold text-green-600 select-all">{order.provider?.mobile_number}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Task summary */}
+                            <div className="text-left md:text-right">
+                              <span className="text-xs text-muted-foreground block">Job Details</span>
+                              <p className="text-sm font-semibold text-foreground line-clamp-1">{order.request?.description}</p>
+                              <span className="text-xs text-muted-foreground">{order.request?.area}, {order.request?.city}</span>
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))}
+
+                          {/* Live location tracking bar */}
+                          {(order.status === 'SELECTED' || order.status === 'IN_PROGRESS') && (
+                            <div className="px-5 pb-5 border-t border-border/50">
+                              <LiveTrackingSimulator order={order} />
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1107,7 +1279,18 @@ export default function CustomerDashboard() {
                         {order.provider?.full_name.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-foreground">{order.provider?.full_name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-foreground">{order.provider?.full_name}</h4>
+                          {(() => {
+                            const badge = getProviderBadge(order.provider?.completed_orders_count || 0);
+                            if (!badge) return null;
+                            return (
+                              <span className={`px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wider rounded-md border ${badge.color}`}>
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate max-w-sm">{order.request?.description}</p>
                       </div>
                     </div>
@@ -1392,6 +1575,90 @@ export default function CustomerDashboard() {
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" className="rounded-xl w-full" onClick={() => setAddressManagerOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Provider Rating / Feedback Modal */}
+      <Dialog open={ratingOrder !== null} onOpenChange={(open) => !open && setRatingOrder(null)}>
+        <DialogContent className="max-w-md border-border bg-card p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500 fill-current animate-bounce" />
+              Rate Your Experience
+            </DialogTitle>
+            <DialogDescription>
+              Please rate the service provided by <span className="font-bold text-foreground">{ratingOrder?.provider?.full_name}</span>. Your feedback helps maintain high standards!
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 my-4">
+            {/* Star Rating Selectors */}
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Rating</span>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((val) => {
+                  const active = val <= ratingValue;
+                  return (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setRatingValue(val)}
+                      className="p-1 transition-transform hover:scale-125 focus:outline-none"
+                    >
+                      <Star className={`h-9 w-9 ${active ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground/30'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-xs font-bold text-foreground mt-1">
+                {ratingValue === 5 ? 'Excellent Work! 🔥' :
+                 ratingValue === 4 ? 'Very Good! 👍' :
+                 ratingValue === 3 ? 'Satisfactory. OK.' :
+                 ratingValue === 2 ? 'Needs Improvement.' :
+                 'Very Unsatisfactory. 😡'}
+              </span>
+            </div>
+
+            {/* Comment Area */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold uppercase text-muted-foreground block">Review Comment</label>
+              <textarea
+                rows={3}
+                placeholder="Share your experience with this provider..."
+                className="flex w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl w-full sm:w-auto"
+              onClick={() => setRatingOrder(null)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl w-full sm:w-auto bg-green-500 text-white hover:bg-green-600 font-bold"
+              onClick={() => {
+                if (ratingOrder) {
+                  submitFeedbackAndComplete(ratingOrder.id, ratingValue, ratingComment);
+                }
+              }}
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Submitting...
+                </span>
+              ) : 'Submit & Release Funds'}
             </Button>
           </DialogFooter>
         </DialogContent>

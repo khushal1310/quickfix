@@ -4,7 +4,7 @@ import { verifyJWT } from '@/lib/jwt';
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate customer
+    // 1. Authenticate provider
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized. Missing token.' }, { status: 401 });
@@ -12,23 +12,22 @@ export async function POST(req: NextRequest) {
 
     const token = authHeader.split(' ')[1];
     const decoded = await verifyJWT(token);
-    if (!decoded || decoded.user_metadata?.role !== 'customer') {
-      return NextResponse.json({ error: 'Unauthorized. Invalid customer session.' }, { status: 401 });
+    if (!decoded || decoded.user_metadata?.role !== 'provider') {
+      return NextResponse.json({ error: 'Unauthorized. Invalid provider session.' }, { status: 401 });
     }
 
-    const customerId = decoded.sub as string;
-    const { requestId, providerId } = await req.json();
+    const providerId = decoded.sub as string;
+    const { requestId } = await req.json();
 
-    if (!requestId || !providerId) {
-      return NextResponse.json({ error: 'Request ID and Provider ID are required.' }, { status: 400 });
+    if (!requestId) {
+      return NextResponse.json({ error: 'Request ID is required.' }, { status: 400 });
     }
 
-    // 2. Fetch service request and check ownership
+    // 2. Fetch service request
     const { data: request, error: requestError } = await supabaseAdmin
       .from('service_requests')
       .select('*')
       .eq('id', requestId)
-      .eq('customer_id', customerId)
       .maybeSingle();
 
     if (requestError) {
@@ -36,31 +35,15 @@ export async function POST(req: NextRequest) {
     }
 
     if (!request) {
-      return NextResponse.json({ error: 'Service request not found or unauthorized.' }, { status: 404 });
+      return NextResponse.json({ error: 'Service request not found.' }, { status: 404 });
     }
 
+    // Concurrency Check: must be OPEN or ACCEPTED
     if (request.status !== 'OPEN' && request.status !== 'ACCEPTED') {
-      return NextResponse.json({ error: 'This service request is no longer open.' }, { status: 400 });
+      return NextResponse.json({ error: 'Sorry, this service request has already been matched or cancelled.' }, { status: 400 });
     }
 
-    // 3. Verify provider actually accepted this request
-    const { data: acceptance, error: acceptError } = await supabaseAdmin
-      .from('provider_accepts')
-      .select('*')
-      .eq('request_id', requestId)
-      .eq('provider_id', providerId)
-      .eq('status', 'ACCEPTED')
-      .maybeSingle();
-
-    if (acceptError) {
-      return NextResponse.json({ error: acceptError.message }, { status: 500 });
-    }
-
-    if (!acceptance) {
-      return NextResponse.json({ error: 'Selected provider has not accepted this request.' }, { status: 400 });
-    }
-
-    // 4. Update request status
+    // 3. Lock the request instantly
     const { error: updateRequestError } = await supabaseAdmin
       .from('service_requests')
       .update({ status: 'SELECTED' })
@@ -70,25 +53,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: updateRequestError.message }, { status: 500 });
     }
 
-    // 5. Create Order
+    // 4. Create Order
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
         request_id: requestId,
-        customer_id: customerId,
+        customer_id: request.customer_id,
         provider_id: providerId,
         status: 'SELECTED',
+        created_at: new Date().toISOString(),
       })
       .select('*')
       .single();
 
     if (orderError) {
-      // Rollback request status (optional, but good practice)
+      // Rollback request status
       await supabaseAdmin.from('service_requests').update({ status: 'OPEN' }).eq('id', requestId);
       return NextResponse.json({ error: orderError.message }, { status: 500 });
     }
 
-    // 6. Create Chat Room
+    // 5. Create Chat Room
     const { error: chatRoomError } = await supabaseAdmin
       .from('chat_rooms')
       .insert({ order_id: order.id });
@@ -97,7 +81,20 @@ export async function POST(req: NextRequest) {
       console.error('Error creating chat room, order created anyway:', chatRoomError);
     }
 
-    // 7. Wallet Hold Logic
+    // 6. Record that the provider accepted it
+    await supabaseAdmin
+      .from('provider_accepts')
+      .upsert(
+        {
+          request_id: requestId,
+          provider_id: providerId,
+          status: 'ACCEPTED',
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: 'request_id,provider_id' }
+      );
+
+    // 7. Wallet Hold Logic (in INR/₹)
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from('wallets')
       .select('*')
@@ -107,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (walletError) {
       console.error('Error fetching provider wallet:', walletError);
     } else if (wallet) {
-      // Calculate Platform Fee (10% of budget, default to $15 if budget is null)
+      // Calculate Platform Fee (10% of budget, default to ₹150 if budget is null)
       const budget = request.budget ? parseFloat(request.budget) : 150.00;
       const platformFee = Math.round((budget * 0.10) * 100) / 100; // 10% fee
 
@@ -141,11 +138,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Provider selected and order generated successfully.',
+      message: 'Instant matching lock successful.',
       orderId: order.id,
     });
   } catch (error: any) {
-    console.error('Select Provider API Error:', error);
-    return NextResponse.json({ error: error.message || 'Server error during provider selection.' }, { status: 500 });
+    console.error('Accept Request API Error:', error);
+    return NextResponse.json({ error: error.message || 'Server error during instant matching.' }, { status: 500 });
   }
 }

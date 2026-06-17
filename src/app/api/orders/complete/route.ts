@@ -94,6 +94,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'confirm') {
+      const { rating, comment } = await req.json();
+
       // Step: Customer confirms completion. Role must be customer, order must be COMPLETED or IN_PROGRESS.
       if (userRole !== 'customer' || order.customer_id !== userId) {
         return NextResponse.json({ error: 'Only the customer can confirm completion.' }, { status: 403 });
@@ -113,6 +115,33 @@ export async function POST(req: NextRequest) {
         .from('service_requests')
         .update({ status: 'COMPLETED' })
         .eq('id', order.request_id);
+
+      // 2. Insert provider review if rating is provided
+      if (rating) {
+        await supabaseAdmin.from('provider_reviews').insert({
+          order_id: orderId,
+          provider_id: order.provider_id,
+          customer_id: order.customer_id,
+          rating: Number(rating),
+          comment: comment || '',
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // 3. Increment provider's completed_orders_count by 1
+      const { data: providerProfile } = await supabaseAdmin
+        .from('users')
+        .select('completed_orders_count')
+        .eq('id', order.provider_id)
+        .maybeSingle();
+
+      if (providerProfile) {
+        const currentCompletedCount = providerProfile.completed_orders_count || 0;
+        await supabaseAdmin
+          .from('users')
+          .update({ completed_orders_count: currentCompletedCount + 1 })
+          .eq('id', order.provider_id);
+      }
 
       // 2. Fetch Wallet of provider to perform calculations
       const { data: wallet, error: walletErr } = await supabaseAdmin
@@ -160,7 +189,7 @@ export async function POST(req: NextRequest) {
             wallet_id: wallet.id,
             type: 'Credit',
             amount: budget,
-            description: `Job earnings of $${budget} for Order ID: ${order.id.slice(0, 8)}`,
+            description: `Job earnings of ₹${budget} for Order ID: ${order.id.slice(0, 8)}`,
           });
 
           // Record Fee Deduction Transaction
@@ -168,7 +197,7 @@ export async function POST(req: NextRequest) {
             wallet_id: wallet.id,
             type: 'Fee Deduction',
             amount: platformFee,
-            description: `Platform fee deduction of $${platformFee} for Order ID: ${order.id.slice(0, 8)}`,
+            description: `Platform fee deduction of ₹${platformFee} for Order ID: ${order.id.slice(0, 8)}`,
           });
         }
       }

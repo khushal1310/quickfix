@@ -149,7 +149,7 @@ export default function LandingPage() {
             {[
               { step: '01', title: 'Submit a Request', desc: 'Detail your service needs, area, city, and select a category. Set a budget and add up to 3 helper images.' },
               { step: '02', title: 'Providers Accept', desc: 'Nearby certified providers receive instant notifications and accept your requests in real-time.' },
-              { step: '03', title: 'Choose Your Provider', desc: 'Compare providers based on rating, reviews, and experience. Selection is completed securely.' },
+              { step: '03', title: 'Instant Matching', desc: 'Once a nearby provider accepts, they are matched instantly. Enjoy location-based tracking in real-time.' },
               { step: '04', title: 'Unlock & Complete', desc: 'Contact details unlock instantly. Chat, complete work, confirm, and pay securely through order updates.' }
             ].map((item, idx) => (
               <div key={idx} className="relative flex flex-col p-6 bg-card border border-border rounded-2xl shadow-xs">

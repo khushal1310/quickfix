@@ -53,11 +53,19 @@ export async function POST(req: NextRequest) {
       createdAt: userRecord.created_at,
     };
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       token,
       user,
     });
+
+    response.cookies.set('qf_token', token, {
+      path: '/',
+      maxAge: 2592000,
+      sameSite: 'strict',
+    });
+
+    return response;
   } catch (error: any) {
     console.error('Login API Error:', error);
     return NextResponse.json({ error: error.message || 'Server error during login.' }, { status: 500 });

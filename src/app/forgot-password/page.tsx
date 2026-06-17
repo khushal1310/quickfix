@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Phone, Lock, HelpCircle, Info, Loader2, ArrowRight, CheckCircle } from 'lucide-react';
+import { Phone, Lock, HelpCircle, Info, Loader2, ArrowRight, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,7 +102,16 @@ export default function ForgotPasswordPage() {
       <Navbar />
       <div className="flex flex-1 items-center justify-center p-4">
         <Card className="w-full max-w-md border-border bg-card">
-          <CardHeader className="space-y-1 text-center">
+          <CardHeader className="space-y-1 text-center relative">
+            {/* Back Button */}
+            <button 
+              type="button"
+              onClick={() => router.push('/login')} 
+              className="absolute left-1.5 top-1.5 p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+              title="Go to Login"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-2">
               <HelpCircle className="h-6 w-6 text-primary" />
             </div>

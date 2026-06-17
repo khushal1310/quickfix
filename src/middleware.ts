@@ -12,7 +12,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/customer') || 
     pathname.startsWith('/provider') || 
     pathname.startsWith('/admin') ||
-    pathname.startsWith('/chat');
+    pathname.startsWith('/chat') ||
+    pathname.startsWith('/account');
 
   if (!isProtectedPath) {
     return NextResponse.next();
@@ -64,5 +65,6 @@ export const config = {
     '/provider/:path*',
     '/admin/:path*',
     '/chat/:path*',
+    '/account/:path*',
   ],
 };

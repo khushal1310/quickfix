@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,9 +12,107 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { 
   Briefcase, Wallet, Clock, CheckCircle, ArrowRight, Loader2, 
-  MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft
+  MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
+
+// Haversine formula to calculate distance in km
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; // Distance in km
+  return d;
+}
+
+// Get Badge Details based on completed order counts
+function getBadgeDetails(count: number) {
+  if (count >= 1000) {
+    return { label: 'Platinum', color: 'bg-slate-900 border-slate-500 text-slate-100 dark:bg-slate-800' };
+  }
+  if (count >= 500) {
+    return { label: 'Gold', color: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' };
+  }
+  if (count >= 250) {
+    return { label: 'Silver', color: 'bg-slate-500/10 border-slate-500/30 text-slate-500' };
+  }
+  if (count >= 50) {
+    return { label: 'Bronze', color: 'bg-amber-700/10 border-amber-700/30 text-amber-700' };
+  }
+  return null;
+}
+
+// Swipe Button Component for instant matches
+function SwipeButton({ onSwipeComplete, text }: { onSwipeComplete: () => void; text: string }) {
+  const [swiped, setSwiped] = useState(false);
+  const [position, setPosition] = useState(0);
+  const sliderRef = useRef<HTMLDivElement>(null);
+
+  const handleStart = (clientX: number) => {
+    if (swiped) return;
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const x = 'touches' in moveEvent ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const sliderWidth = sliderRef.current?.offsetWidth || 200;
+      const maxPosition = sliderWidth - 46; // handle width (36px) + padding
+      const deltaX = Math.max(0, Math.min(x - clientX, maxPosition));
+      setPosition(deltaX);
+
+      if (deltaX >= maxPosition - 5) {
+        setSwiped(true);
+        setPosition(maxPosition);
+        onSwipeComplete();
+        cleanup();
+      }
+    };
+
+    const handleEnd = () => {
+      if (!swiped) {
+        setPosition(0);
+      }
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: true });
+    window.addEventListener('touchend', handleEnd);
+  };
+
+  return (
+    <div 
+      ref={sliderRef}
+      className="relative w-full h-11 bg-muted rounded-xl border border-border overflow-hidden select-none flex items-center justify-center"
+    >
+      <div 
+        className="absolute inset-y-0 left-0 bg-primary/20 rounded-xl transition-all duration-75"
+        style={{ width: `${position + 22}px` }}
+      />
+      <span className="text-xs font-black text-muted-foreground animate-pulse pointer-events-none z-10">
+        {swiped ? 'Accepted!' : text}
+      </span>
+      <div
+        onMouseDown={(e) => handleStart(e.clientX)}
+        onTouchStart={(e) => handleStart(e.touches[0].clientX)}
+        className="absolute left-1 top-1 w-9 h-9 bg-primary hover:bg-primary/95 text-white rounded-lg flex items-center justify-center cursor-grab active:cursor-grabbing shadow-md transition-transform duration-75 z-20"
+        style={{ transform: `translateX(${position}px)` }}
+      >
+        <span className="text-sm font-black">&rarr;</span>
+      </div>
+    </div>
+  );
+}
 
 export default function ProviderDashboard() {
   const router = useRouter();
@@ -43,6 +141,23 @@ export default function ProviderDashboard() {
 
   // Category details
   const [providerCategory, setProviderCategory] = useState<any | null>(null);
+  const [dbUser, setDbUser] = useState<any | null>(null);
+  const [providerLat, setProviderLat] = useState<number>(23.0240);
+  const [providerLng, setProviderLng] = useState<number>(72.5720);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setProviderLat(pos.coords.latitude);
+          setProviderLng(pos.coords.longitude);
+        },
+        (err) => {
+          console.warn('Provider geolocation unavailable, falling back to Bob coordinates.');
+        }
+      );
+    }
+  }, []);
 
   // Fetch all provider data
   useEffect(() => {
@@ -86,6 +201,7 @@ export default function ProviderDashboard() {
     const { data: userProfile } = await supabase.from('users').select('*').eq('id', user.id).single();
     let categoryObj = null;
     if (userProfile) {
+      setDbUser(userProfile);
       // Find category
       const { data: cat } = await supabase
         .from('service_categories')
@@ -143,8 +259,17 @@ export default function ProviderDashboard() {
     // If we have rejected list, exclude them
     const { data: reqs } = await reqsQuery;
     if (reqs) {
-      // Filter out rejected ones
-      const filteredReqs = reqs.filter(r => !rejectedIds.includes(r.id));
+      // Filter out rejected ones and those outside 1km
+      const filteredReqs = reqs.filter(r => {
+        if (rejectedIds.includes(r.id)) return false;
+        
+        // If request has coordinates, calculate distance
+        if (r.latitude !== undefined && r.longitude !== undefined && providerLat && providerLng) {
+          const dist = getDistanceKm(providerLat, providerLng, r.latitude, r.longitude);
+          return dist <= 1.0;
+        }
+        return true; // fallback
+      });
       setNearbyRequests(filteredReqs);
     }
 
@@ -161,29 +286,24 @@ export default function ProviderDashboard() {
   const handleAcceptRequest = async (requestId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('provider_accepts')
-        .upsert(
-          {
-            request_id: requestId,
-            provider_id: user?.id,
-            status: 'ACCEPTED',
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: 'request_id,provider_id' }
-        );
+      const res = await fetch('/api/orders/accept-by-provider', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('qf_token')}`
+        },
+        body: JSON.stringify({ requestId })
+      });
+      const data = await res.json();
 
-      if (error) throw error;
-
-      // Also trigger updating the service request status to ACCEPTED if it was OPEN
-      await supabase
-        .from('service_requests')
-        .update({ status: 'ACCEPTED' })
-        .eq('id', requestId)
-        .eq('status', 'OPEN');
-
-      toastSuccess('Service Request accepted successfully! Waiting for customer selection.');
-      fetchProviderData();
+      if (res.ok) {
+        toastSuccess('Match locked! Job assigned to you. Go to Assigned tab.');
+        // Set tab to assigned instantly
+        setActiveTab('assigned');
+        fetchProviderData();
+      } else {
+        toastError(data.error || 'Failed to accept request.');
+      }
     } catch (err: any) {
       toastError(err.message || 'Failed to accept request.');
     } finally {
@@ -319,10 +439,31 @@ export default function ProviderDashboard() {
       </div>
 
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-8 md:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6 mb-8">
           <div>
-            <h1 className="text-3xl font-black text-foreground">Provider Hub</h1>
-            <p className="text-muted-foreground text-sm">Browse jobs nearby, accept matches, and track your wallet earnings.</p>
+            <div className="flex items-center gap-2">
+              <button 
+                type="button"
+                onClick={() => router.push('/')} 
+                className="p-2 -ml-2 rounded-full hover:bg-muted text-foreground transition-all shrink-0"
+                aria-label="Go Back"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </button>
+              <h1 className="text-3xl font-black text-foreground flex items-center gap-2.5">
+                Provider Hub
+                {dbUser && getBadgeDetails(dbUser.completed_orders_count || 0) && (
+                  (() => {
+                    const badge = getBadgeDetails(dbUser.completed_orders_count || 0);
+                    return (
+                      <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${badge?.color}`}>
+                        {badge?.label} Badge
+                      </span>
+                    );
+                  })()
+                )}
+              </h1>
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">Browse jobs nearby, accept matches, and track your wallet earnings.</p>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -349,7 +490,6 @@ export default function ProviderDashboard() {
               Wallet
             </Button>
           </div>
-        </div>
 
         {activeTab === 'nearby' && (
           // Nearby Requests list
@@ -408,35 +548,21 @@ export default function ProviderDashboard() {
                           </div>
                         )}
                       </CardContent>
-                      <CardFooter className="p-5 border-t border-border bg-muted/10 flex gap-2">
-                        {isAccepted ? (
-                          <Button
-                            variant="outline"
-                            className="flex-1 rounded-xl text-red-500 hover:bg-red-500/10 font-bold"
-                            onClick={() => handleWithdrawAcceptance(req.id)}
-                            disabled={loading}
-                          >
-                            Withdraw Acceptance
-                          </Button>
-                        ) : (
-                          <>
-                            <Button
-                              variant="outline"
-                              className="flex-1 rounded-xl text-muted-foreground hover:bg-muted font-bold"
-                              onClick={() => handleRejectRequest(req.id)}
-                              disabled={loading}
-                            >
-                              Hide
-                            </Button>
-                            <Button
-                              className="flex-1 rounded-xl bg-primary text-white hover:bg-primary-hover font-bold"
-                              onClick={() => handleAcceptRequest(req.id)}
-                              disabled={loading}
-                            >
-                              Accept
-                            </Button>
-                          </>
-                        )}
+                      <CardFooter className="p-5 border-t border-border bg-muted/10 flex flex-col sm:flex-row gap-3">
+                        <Button
+                          variant="outline"
+                          className="w-full sm:w-20 rounded-xl text-muted-foreground hover:bg-muted font-bold h-11"
+                          onClick={() => handleRejectRequest(req.id)}
+                          disabled={loading}
+                        >
+                          Hide
+                        </Button>
+                        <div className="flex-1 w-full">
+                          <SwipeButton
+                            text="Swipe to Accept"
+                            onSwipeComplete={() => handleAcceptRequest(req.id)}
+                          />
+                        </div>
                       </CardFooter>
                     </Card>
                   );
