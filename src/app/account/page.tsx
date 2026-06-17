@@ -165,6 +165,12 @@ export default function AccountPage() {
         setEditMobile(profileDetails.mobileNumber);
         setEditImage(profileDetails.profileImage);
         setEditEmail(profileDetails.email || '');
+      } else {
+        // User record was deleted or reset from MongoDB, log out to prevent blank page
+        console.warn('User record not found in MongoDB. Logging out...');
+        logout();
+        router.replace('/login');
+        return;
       }
 
       // 2. Fetch Wallet Balance
@@ -518,7 +524,26 @@ export default function AccountPage() {
     );
   }
 
-  if (!profile) return null;
+  if (!profile) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 text-center">
+        <AlertCircle className="h-12 w-12 text-destructive mb-4 animate-bounce" />
+        <h1 className="text-xl font-bold text-foreground mb-2">Session Expired</h1>
+        <p className="text-muted-foreground text-sm max-w-sm mb-6">
+          Your account could not be found or your session has expired. This usually happens after a database reset.
+        </p>
+        <Button 
+          onClick={() => {
+            logout();
+            router.replace('/login');
+          }}
+          className="rounded-xl px-6 py-2.5 bg-primary text-white font-bold"
+        >
+          Return to Login
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background pb-20 sm:pb-0">
