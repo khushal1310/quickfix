@@ -118,6 +118,7 @@ export default function ProviderDashboard() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
+  const prevRequestIdsRef = useRef<string[]>([]);
 
   // Redirect if not authorized
   useEffect(() => {
@@ -270,6 +271,25 @@ export default function ProviderDashboard() {
         }
         return true; // fallback
       });
+      
+      // Check for new requests to trigger notification toast and audio alert
+      const currentIds = filteredReqs.map(r => r.id);
+      const prevIds = prevRequestIdsRef.current;
+      const newReqs = filteredReqs.filter(r => !prevIds.includes(r.id));
+      
+      if (newReqs.length > 0 && prevIds.length > 0) {
+        try {
+          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav');
+          audio.volume = 0.5;
+          audio.play().catch(e => console.log('Audio playback blocked by browser policy.'));
+        } catch (e) {}
+        
+        newReqs.forEach(req => {
+          toastSuccess(`New nearby task: ${req.category?.name || 'Service Requested'} (₹${req.budget || ''})`);
+        });
+      }
+      
+      prevRequestIdsRef.current = currentIds;
       setNearbyRequests(filteredReqs);
     }
 
