@@ -57,6 +57,7 @@ interface UserDBDetails {
   kycStatus: 'verified' | 'pending' | 'unverified';
   completedOrdersCount?: number;
   serviceCategory?: string;
+  selfieUrl?: string;
 }
 
 // Resolver for provider badges
@@ -160,6 +161,7 @@ export default function AccountPage() {
           kycStatus: userRecord.kyc_status || 'unverified',
           completedOrdersCount: userRecord.completed_orders_count || 0,
           serviceCategory: userRecord.service_category || '',
+          selfieUrl: userRecord.selfie_url || '',
         };
         setProfile(profileDetails);
 
@@ -330,6 +332,26 @@ export default function AccountPage() {
     e.preventDefault();
     setModalLoading(true);
     try {
+      // Age limit check: Must be 18+ to register as provider
+      let age = 0;
+      const storedUserString = localStorage.getItem('qf_user');
+      if (storedUserString) {
+        const u = JSON.parse(storedUserString);
+        if (u.dob) {
+          const today = new Date();
+          const birthDate = new Date(u.dob);
+          age = today.getFullYear() - birthDate.getFullYear();
+          const m = today.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+        }
+      }
+
+      if (age < 18) {
+        throw new Error('Age restriction: You must be 18 years or older to register as a service provider.');
+      }
+
       const res = await fetch('/api/auth/become-provider', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -458,6 +480,26 @@ export default function AccountPage() {
 
     setKycSubmitting(true);
     try {
+      // Age limit check for providers: Must be 18+ to verify
+      let age = 0;
+      const storedUserString = localStorage.getItem('qf_user');
+      if (storedUserString) {
+        const u = JSON.parse(storedUserString);
+        if (u.dob) {
+          const today = new Date();
+          const birthDate = new Date(u.dob);
+          age = today.getFullYear() - birthDate.getFullYear();
+          const m = today.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+          }
+        }
+      }
+
+      if (profile?.role === 'provider' && age < 18) {
+        throw new Error('KYC Rejected: You must be 18 years or older to verify as a service provider.');
+      }
+
       const { error } = await supabase
         .from('users')
         .update({

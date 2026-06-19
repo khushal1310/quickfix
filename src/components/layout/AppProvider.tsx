@@ -24,11 +24,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadSession();
   }, [loadSession]);
 
-  const handleDobSaveSuccess = async (dob: string) => {
+  const handleDobSaveSuccess = async (dob: string, selfieUrl?: string) => {
     const storedUser = localStorage.getItem('qf_user');
     if (storedUser) {
       const u = JSON.parse(storedUser);
       u.dob = dob;
+      if (selfieUrl) {
+        u.selfie_url = selfieUrl;
+        u.selfieUrl = selfieUrl;
+      }
       localStorage.setItem('qf_user', JSON.stringify(u));
     }
     await loadSession();

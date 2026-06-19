@@ -145,6 +145,17 @@ export default function ProviderDashboard() {
   const [dbUser, setDbUser] = useState<any | null>(null);
   const [providerLat, setProviderLat] = useState<number>(23.0240);
   const [providerLng, setProviderLng] = useState<number>(72.5720);
+  const [bypassDistance, setBypassDistance] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('qf_bypass_distance') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('qf_bypass_distance', String(bypassDistance));
+    fetchProviderData();
+  }, [bypassDistance]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -260,9 +271,11 @@ export default function ProviderDashboard() {
     // If we have rejected list, exclude them
     const { data: reqs } = await reqsQuery;
     if (reqs) {
-      // Filter out rejected ones and those outside 1km
+      // Filter out rejected ones and those outside 1km (if not bypassed)
       const filteredReqs = reqs.filter(r => {
         if (rejectedIds.includes(r.id)) return false;
+        
+        if (bypassDistance) return true;
         
         // If request has coordinates, calculate distance
         if (r.latitude !== undefined && r.longitude !== undefined && providerLat && providerLng) {
@@ -514,10 +527,22 @@ export default function ProviderDashboard() {
         {activeTab === 'nearby' && (
           // Nearby Requests list
           <div className="space-y-6">
-            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Service Requests Nearby ({nearbyRequests.length})
-            </h3>
+            <div className="flex flex-wrap justify-between items-center gap-4">
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Service Requests Nearby ({nearbyRequests.length})
+              </h3>
+              
+              <label className="inline-flex items-center gap-2 cursor-pointer bg-primary/5 hover:bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-xl transition-all">
+                <input 
+                  type="checkbox" 
+                  checked={bypassDistance}
+                  onChange={(e) => setBypassDistance(e.target.checked)}
+                  className="rounded text-primary focus:ring-primary h-4 w-4 border-border"
+                />
+                <span className="text-xs font-bold text-primary select-none">Test Mode: Bypass 1km Limit</span>
+              </label>
+            </div>
 
             {nearbyRequests.length === 0 ? (
               <Card className="border-border bg-card p-12 text-center text-muted-foreground">

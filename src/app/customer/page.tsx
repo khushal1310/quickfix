@@ -1107,18 +1107,19 @@ export default function CustomerDashboard() {
                                 {req.budget ? formatCurrency(req.budget) : 'N/A'}
                               </span>
                             </div>
-                            {req.status === 'OPEN' || req.status === 'ACCEPTED' ? (
-                              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary animate-pulse py-1">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Searching for nearby providers within 1km...
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 py-1">
+                            {req.status !== 'OPEN' && req.status !== 'ACCEPTED' && (
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 py-1 bg-green-500/10 border border-green-500/20 px-3 rounded-full">
                                 <Check className="h-3.5 w-3.5" />
                                 Matched
                               </div>
                             )}
                           </div>
+                          {(req.status === 'OPEN' || req.status === 'ACCEPTED') && (
+                            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-primary bg-primary/5 border border-primary/20 p-2.5 rounded-xl animate-pulse w-full justify-center">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <span>Searching for nearby providers within 1km...</span>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     ))}

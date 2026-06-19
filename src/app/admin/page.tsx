@@ -445,7 +445,41 @@ export default function AdminPanel() {
                               </span>
                             )}
                           </div>
-                          <span className="text-xs text-muted-foreground block">Phone: {target.mobile_number}</span>
+                          <span className="text-xs text-muted-foreground block font-semibold mt-0.5">Phone: {target.mobile_number}</span>
+                          {target.dob && (
+                            <span className="text-xs text-muted-foreground block font-semibold mt-0.5">
+                              DOB: {target.dob} (Age: {(() => {
+                                const today = new Date();
+                                const birthDate = new Date(target.dob);
+                                let age = today.getFullYear() - birthDate.getFullYear();
+                                const m = today.getMonth() - birthDate.getMonth();
+                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                  age--;
+                                }
+                                return age;
+                              })()})
+                            </span>
+                          )}
+                          {target.selfie_url && (
+                            <div className="mt-2 flex items-center gap-2.5 bg-muted/50 p-2 rounded-xl border border-border max-w-xs shadow-xs">
+                              <img 
+                                src={target.selfie_url} 
+                                alt="Selfie Verification" 
+                                className="h-11 w-11 rounded-lg object-cover border border-border"
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase text-primary tracking-wider leading-none">Security Selfie</span>
+                                <a 
+                                  href={target.selfie_url} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-[9px] text-blue-500 hover:underline font-bold mt-1 inline-block"
+                                >
+                                  View Full Image
+                                </a>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Wrench, Zap, Sparkles, Cpu, Paintbrush, Bug, CheckCircle, ArrowRight, Star, HelpCircle } from 'lucide-react';
@@ -8,9 +8,39 @@ import { Navbar } from '@/components/layout/Navbar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 export default function LandingPage() {
   const { user, isAuthenticated } = useAuth();
+
+  const [reviewName, setReviewName] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewName.trim() || !reviewComment.trim()) return;
+    setSubmittingReview(true);
+    try {
+      const { error } = await supabase.from('platform_reviews').insert({
+        name: reviewName,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      if (error) throw error;
+      setReviewSuccess(true);
+      setReviewName('');
+      setReviewComment('');
+      setReviewRating(5);
+      setTimeout(() => setReviewSuccess(false), 5000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -222,6 +252,78 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Platform Review Form */}
+      <section className="py-20 px-4 md:px-8 bg-card border-t border-border">
+        <div className="mx-auto max-w-xl">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-black tracking-tight text-foreground">Share Your Feedback</h2>
+            <p className="text-muted-foreground mt-2 text-sm">We value your opinion! Let us know how we can make QuickFix even better.</p>
+          </div>
+
+          <form onSubmit={handleReviewSubmit} className="space-y-5 bg-background p-6 md:p-8 rounded-3xl border border-border/80 shadow-lg">
+            {reviewSuccess && (
+              <div className="bg-green-500/10 border border-green-500/20 text-green-600 rounded-xl p-4 text-sm font-bold text-center">
+                Thank you! Your feedback has been submitted successfully.
+              </div>
+            )}
+            
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your Name</label>
+              <input 
+                type="text" 
+                value={reviewName}
+                onChange={(e) => setReviewName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full h-11 px-4 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm font-semibold"
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rating</label>
+              <div className="flex gap-2.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setReviewRating(star)}
+                    className="p-1 focus:outline-none transition-transform active:scale-95"
+                  >
+                    <Star 
+                      className={`h-7 w-7 ${
+                        star <= reviewRating 
+                          ? 'text-yellow-500 fill-yellow-500' 
+                          : 'text-muted-foreground/30 hover:text-yellow-500/50'
+                      }`} 
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Comments / Suggestions</label>
+              <textarea 
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                placeholder="Tell us what you think..."
+                rows={4}
+                className="w-full p-4 rounded-xl border border-border bg-card text-foreground focus:outline-none focus:ring-1 focus:ring-primary text-sm font-semibold resize-none"
+                required
+              />
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full rounded-xl py-3 font-bold bg-primary text-white hover:bg-primary/95 shadow-md flex items-center justify-center gap-1.5"
+              disabled={submittingReview}
+            >
+              {submittingReview ? 'Submitting...' : 'Submit Feedback'}
+            </Button>
+          </form>
         </div>
       </section>
 
