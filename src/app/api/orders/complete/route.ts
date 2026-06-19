@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
     const userId = decoded.sub as string;
     const userRole = decoded.user_metadata?.role as 'customer' | 'provider' | 'admin';
 
-    const { orderId, action } = await req.json(); // action: 'start', 'complete', 'confirm'
+    const body = await req.json();
+    const { orderId, action, rating, comment } = body;
 
     if (!orderId || !action) {
       return NextResponse.json({ error: 'Order ID and Action are required.' }, { status: 400 });
@@ -94,8 +95,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'confirm') {
-      const { rating, comment } = await req.json();
-
       // Step: Customer confirms completion. Role must be customer, order must be COMPLETED or IN_PROGRESS.
       if (userRole !== 'customer' || order.customer_id !== userId) {
         return NextResponse.json({ error: 'Only the customer can confirm completion.' }, { status: 403 });
