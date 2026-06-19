@@ -160,16 +160,28 @@ export default function ProviderDashboard() {
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setProviderLat(pos.coords.latitude);
-          setProviderLng(pos.coords.longitude);
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setProviderLat(latitude);
+          setProviderLng(longitude);
+
+          // Silently update provider coordinates in database
+          if (user) {
+            await supabase
+              .from('users')
+              .update({
+                latitude,
+                longitude
+              })
+              .eq('id', user.id);
+          }
         },
         (err) => {
-          console.warn('Provider geolocation unavailable, falling back to Bob coordinates.');
+          console.warn('Provider geolocation unavailable, falling back to Bob coordinates.', err);
         }
       );
     }
-  }, []);
+  }, [user]);
 
   // Fetch all provider data
   useEffect(() => {
@@ -562,11 +574,17 @@ export default function ProviderDashboard() {
                           <span className="text-xs text-muted-foreground">{formatDate(req.created_at)}</span>
                         </div>
                         <CardTitle className="text-base font-bold mt-3 leading-snug line-clamp-2">{req.description}</CardTitle>
-                        <CardDescription className="flex items-center gap-1 mt-1.5">
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <CardDescription className="flex flex-wrap items-center gap-1 mt-1.5">
+                          <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span>{req.area}, {req.city}</span>
                           <span className="text-muted-foreground font-semibold text-xs bg-muted border border-border px-1.5 py-0.5 rounded-md">Approximate Location</span>
                         </CardDescription>
+                        {req.latitude !== undefined && req.longitude !== undefined && providerLat && providerLng && (
+                          <div className="mt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground font-semibold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            <span>Distance: {getDistanceKm(providerLat, providerLng, req.latitude, req.longitude).toFixed(2)} km away</span>
+                          </div>
+                        )}
                       </CardHeader>
                       <CardContent className="p-5 pt-0">
                         {/* Budget Info */}

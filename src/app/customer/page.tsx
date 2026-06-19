@@ -136,6 +136,33 @@ export default function CustomerDashboard() {
   const [reqLatitude, setReqLatitude] = useState<number | null>(null);
   const [reqLongitude, setReqLongitude] = useState<number | null>(null);
 
+  // Automatically query user geolocation on page load
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setReqLatitude(latitude);
+          setReqLongitude(longitude);
+          
+          // Silently update user record in database
+          if (user) {
+            await supabase
+              .from('users')
+              .update({
+                latitude,
+                longitude
+              })
+              .eq('id', user.id);
+          }
+        },
+        (err) => {
+          console.warn('Auto-geolocation denied/failed.', err);
+        }
+      );
+    }
+  }, [user]);
+
   // Address Manager Add Form states
   const [mgrLabel, setMgrLabel] = useState('Home');
   const [mgrArea, setMgrArea] = useState('');
