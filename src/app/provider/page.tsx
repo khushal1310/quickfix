@@ -953,7 +953,7 @@ export default function ProviderDashboard() {
                         <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                           <div className="flex items-center gap-4">
                             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-base border border-primary/20">
-                              {order.customer?.full_name.slice(0, 2).toUpperCase()}
+                              {(order.customer?.full_name || 'QF').slice(0, 2).toUpperCase()}
                             </div>
                             <div>
                               <h4 className="text-base font-bold text-foreground">{order.customer?.full_name}</h4>

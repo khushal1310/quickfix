@@ -15,10 +15,60 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   Sparkles, Wrench, Zap, Cpu, Paintbrush, Bug, 
   MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History,
-  Home, Briefcase, ArrowLeft
+  Home, Briefcase, ArrowLeft, Clock
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
+
+// Client-side image resizer and compressor to enable instant uploads
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800; // Limit size to 800px max
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: Date.now()
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          }, 'image/jpeg', 0.7); // 70% quality compression
+        } else {
+          resolve(file);
+        }
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface Category {
   id: string;
@@ -692,13 +742,15 @@ export default function CustomerDashboard() {
       // 2. Upload images to Supabase Storage if selected
       if (images.length > 0) {
         for (const file of images) {
-          const fileExt = file.name.split('.').pop();
+          // Compress the image client-side to ensure instant uploads
+          const compressed = await compressImage(file);
+          const fileExt = 'jpg'; // force .jpg extension since we compress to JPEG quality
           const fileName = `${request.id}-${Math.random().toString(36).substring(7)}.${fileExt}`;
           const filePath = `${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('request-images')
-            .upload(filePath, file);
+            .upload(filePath, compressed);
 
           if (uploadError) {
             console.error('Image upload error:', uploadError);
@@ -1462,7 +1514,7 @@ export default function CustomerDashboard() {
                   <Card key={order.id} className="border-border bg-card p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-4">
                       <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center font-bold text-muted-foreground">
-                        {order.provider?.full_name.slice(0, 2).toUpperCase()}
+                        {(order.provider?.full_name || 'QP').slice(0, 2).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
