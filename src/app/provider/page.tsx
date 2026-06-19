@@ -536,6 +536,23 @@ export default function ProviderDashboard() {
             </Button>
           </div>
 
+        {dbUser?.kyc_status !== 'verified' && (
+          <div className="mt-6 bg-red-500/10 border border-red-500/25 p-4 rounded-2xl flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="text-sm font-bold text-red-500">Aadhaar KYC Verification Required</h4>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-normal">
+                To accept local service requests, you must complete your identity verification. Please go to the Account page to complete your Aadhaar card validation.
+              </p>
+              <Link href="/account">
+                <Button size="sm" className="mt-3 rounded-lg bg-red-600 hover:bg-red-600/90 text-white font-bold text-xs h-8">
+                  Go to Account & Verify
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'nearby' && (
           // Nearby Requests list
           <div className="space-y-6">
@@ -621,10 +638,19 @@ export default function ProviderDashboard() {
                           Hide
                         </Button>
                         <div className="flex-1 w-full">
-                          <SwipeButton
-                            text="Swipe to Accept"
-                            onSwipeComplete={() => handleAcceptRequest(req.id)}
-                          />
+                          {dbUser?.kyc_status === 'verified' ? (
+                            <SwipeButton
+                              text="Swipe to Accept"
+                              onSwipeComplete={() => handleAcceptRequest(req.id)}
+                            />
+                          ) : (
+                            <Button
+                              className="w-full rounded-xl bg-muted text-muted-foreground border border-border font-bold h-11 cursor-not-allowed flex items-center justify-center gap-1.5"
+                              disabled
+                            >
+                              🔒 KYC Verification Required
+                            </Button>
+                          )}
                         </div>
                       </CardFooter>
                     </Card>
