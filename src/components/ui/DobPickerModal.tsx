@@ -35,7 +35,6 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
   const [capturedSelfie, setCapturedSelfie] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Refs for scroll columns to support touch/scroll interaction
   const monthRef = useRef<HTMLDivElement>(null);
@@ -92,6 +91,17 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
     };
   }, [stream]);
 
+  // Keep video source in sync with stream when video element mounts/demounts
+  useEffect(() => {
+    if (cameraActive && stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(err => {
+        console.warn("Video auto-play failed, waiting for user interaction:", err);
+      });
+    }
+  }, [cameraActive, stream, capturedSelfie]);
+
+
   const handleScroll = (
     e: React.UIEvent<HTMLDivElement>, 
     type: 'month' | 'day' | 'year'
@@ -122,7 +132,7 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 400, height: 400 }
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
       });
       setStream(mediaStream);
       setCameraActive(true);
@@ -158,11 +168,23 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
       canvas.height = 400;
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Mirror the canvas image to match the video preview scale-x-[-1]
+        ctx.translate(400, 0);
+        ctx.scale(-1, 1);
+
         const video = videoRef.current;
-        const size = Math.min(video.videoWidth, video.videoHeight);
-        const xOffset = (video.videoWidth - size) / 2;
-        const yOffset = (video.videoHeight - size) / 2;
-        ctx.drawImage(video, xOffset, yOffset, size, size, 0, 0, 400, 400);
+        const vWidth = video.videoWidth || video.clientWidth || 400;
+        const vHeight = video.videoHeight || video.clientHeight || 400;
+        const size = Math.min(vWidth, vHeight);
+        
+        if (size > 0) {
+          const xOffset = (vWidth - size) / 2;
+          const yOffset = (vHeight - size) / 2;
+          ctx.drawImage(video, xOffset, yOffset, size, size, 0, 0, 400, 400);
+        } else {
+          ctx.drawImage(video, 0, 0, 400, 400);
+        }
+
         const base64Img = canvas.toDataURL('image/jpeg', 0.85);
         setCapturedSelfie(base64Img);
         stopWebcam();
@@ -170,18 +192,7 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
     }
   };
 
-  // File Upload fallback for devices/browsers that block direct webcam
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCapturedSelfie(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-      stopWebcam();
-    }
-  };
+
 
   // Save DOB and Selfie to database
   const handleSaveAll = async () => {
@@ -373,26 +384,7 @@ export function DobPickerModal({ userId, onSaveSuccess }: DobPickerModalProps) {
                 </Button>
               )}
 
-              {/* File Upload Fallback always accessible */}
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                accept="image/*"
-                capture="user"
-                className="hidden"
-              />
 
-              <Button
-                variant="ghost"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full text-xs font-bold text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                Upload Photo from Device
-              </Button>
-
-              <div className="h-[1px] bg-border/50 my-2" />
 
               <div className="flex gap-3">
                 <Button 

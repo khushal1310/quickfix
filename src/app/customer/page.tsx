@@ -18,6 +18,7 @@ import {
   Home, Briefcase, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { LeafletMap } from '@/components/ui/LeafletMap';
 
 interface Category {
   id: string;
@@ -44,6 +45,15 @@ function getProviderBadge(count: number) {
 
 // Live tracking simulator component
 function LiveTrackingSimulator({ order }: { order: any }) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick(t => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const startTime = new Date(order.created_at || order.started_at || new Date()).getTime();
   const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
   
@@ -55,42 +65,149 @@ function LiveTrackingSimulator({ order }: { order: any }) {
   const etaStr = remainingSec > 0 ? `${etaMin}:${etaSec < 10 ? '0' : ''}${etaSec}` : 'Arrived';
   
   const progressPercent = Math.min(100, (elapsedSec / totalTripSec) * 100);
+
+  // Start location is the provider's registered location
+  const startLat = order.provider?.latitude || 23.0240;
+  const startLng = order.provider?.longitude || 72.5720;
+  
+  // Target location is the customer's request location
+  const destLat = order.request?.latitude || 23.0225;
+  const destLng = order.request?.longitude || 72.5714;
+  
+  // Interpolate provider's current coordinates based on progress percent
+  const currentLat = startLat + (destLat - startLat) * (progressPercent / 100);
+  const currentLng = startLng + (destLng - startLng) * (progressPercent / 100);
+
+  const etaText = remainingSec > 0 ? `${etaMin} mins away from you` : 'Arrived';
   
   return (
-    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mt-4 space-y-3 shadow-xs">
-      <div className="flex justify-between items-center">
-        <span className="text-xs font-black text-primary uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
-          <span className="h-2 w-2 rounded-full bg-primary" />
-          Live Provider Tracking
-        </span>
-        <span className="text-xs font-bold text-foreground bg-background px-2.5 py-1 rounded-full border border-border shadow-xs">
-          ETA: <span className="font-mono text-primary font-black">{etaStr}</span>
-        </span>
-      </div>
-      
-      {/* Progress Scooter bar */}
-      <div className="relative h-6 bg-muted rounded-full overflow-hidden flex items-center px-1">
-        <div 
-          className="absolute inset-y-0 left-0 bg-primary/10 transition-all duration-1000"
-          style={{ width: `${progressPercent}%` }}
+    <div className="space-y-4">
+      {/* Map Header / Live Route Map (Zomato/Swiggy style) */}
+      <div className="relative mt-2">
+        <LeafletMap
+          providerLat={currentLat}
+          providerLng={currentLng}
+          customerLat={destLat}
+          customerLng={destLng}
+          orderId={order.id}
         />
         
-        {/* Sliding Scooter icon */}
-        <div 
-          className="absolute transition-all duration-1000 flex items-center gap-1 text-primary"
-          style={{ left: `calc(${progressPercent}% - 24px)` }}
-        >
-          <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24">
-            <path d="M19 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm-9 0c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm11.23-7.77c-.4-.4-.9-.63-1.46-.7L16 6h-3.5c-.83 0-1.5.67-1.5 1.5V9H7.82C7.4 7.84 6.3 7 5 7c-1.66 0-3 1.34-3 3 0 .42.09.82.25 1.18l2.22 4.44C4.85 16.32 5.86 17 7 17h1v1c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2v-1h2.24l2.12-4.24c.42-.84.42-1.84 0-2.68l-2.13-4.85z"/>
-          </svg>
+        {/* Floating ETA Label Overlay */}
+        <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
+          <span className="w-2 h-2 rounded-full bg-green-500" />
+          {etaText}
         </div>
       </div>
-      <p className="text-[10px] text-muted-foreground font-semibold text-center mt-1">
-        {progressPercent < 30 ? 'Provider has accepted match and is preparing tools...' :
-         progressPercent < 75 ? 'Provider is driving towards your location...' :
-         progressPercent < 100 ? 'Provider is arriving in your street now...' :
-         'Provider has arrived!'}
-      </p>
+
+      {/* Swiggy Style Order details card */}
+      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
+        
+        {/* Restaurant Header style */}
+        <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
+          <div>
+            <h4 className="text-base font-black text-foreground flex items-center gap-1.5">
+              <span>QuickFix Partner</span>
+              <span className="bg-green-600/10 border border-green-500/20 text-green-600 text-[10px] px-1.5 py-0.5 rounded font-black">
+                {order.provider?.rating ? `${order.provider.rating}★` : '4.8★'}
+              </span>
+            </h4>
+            <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Category: {order.request?.category?.name || 'Service provider'}</p>
+          </div>
+          <span className="text-[10px] font-black bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full">
+            Active order
+          </span>
+        </div>
+
+        {/* Order Items */}
+        <div className="p-4 space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex gap-2.5 items-start">
+              {/* Veg icon decoration */}
+              <div className="w-4 h-4 border border-green-600 rounded flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-2 h-2 bg-green-600 rounded-full" />
+              </div>
+              <div>
+                <span className="text-sm font-black text-foreground block">
+                  1x {order.request?.category?.name || 'Service Task'}
+                </span>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed font-semibold">
+                  {order.request?.description}
+                </p>
+                {/* Real photo if uploaded by customer */}
+                {order.request?.request_images && order.request.request_images.length > 0 && (
+                  <div className="flex gap-1.5 mt-2.5">
+                    {order.request.request_images.map((img: any, i: number) => (
+                      <img 
+                        key={i} 
+                        src={img.image_url} 
+                        alt="reference" 
+                        className="h-14 w-14 rounded-lg object-cover border border-border cursor-zoom-in"
+                        onClick={() => window.open(img.image_url, '_blank')}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <span className="text-sm font-bold text-foreground">
+              {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}
+            </span>
+          </div>
+
+          <div className="h-[1px] bg-border/50" />
+
+          {/* Delivery progress details */}
+          <div className="space-y-3.5 text-xs font-semibold text-muted-foreground">
+            
+            <div className="flex items-start gap-2.5">
+              <Clock className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-foreground font-black block">Delivery in {remainingSec > 0 ? `${etaMin} mins` : 'Arrived'}</span>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                  {progressPercent < 30 ? 'Partner has accepted match and is preparing tools...' :
+                   progressPercent < 75 ? 'Partner is driving towards your location...' :
+                   progressPercent < 100 ? 'Partner is arriving in your street now...' :
+                   'Partner has arrived!'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+              <div>
+                <span className="text-foreground font-black block">Delivery at Home</span>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                  {order.request?.area}, {order.request?.city}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <Phone className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-foreground font-black block">Partner Details</span>
+                <span className="text-[10px] text-muted-foreground block mt-0.5 select-all">
+                  Name: {order.provider?.full_name} | Mobile: {order.provider?.mobile_number}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5">
+              <svg className="h-4 w-4 text-purple-500 shrink-0 mt-0.5 fill-current" viewBox="0 0 24 24">
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+              </svg>
+              <div>
+                <span className="text-foreground font-black block">Total Payout bill: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}</span>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">Incl. platform service taxes and charges</span>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
     </div>
   );
 }
@@ -1175,7 +1292,7 @@ export default function CustomerDashboard() {
                       return (
                         <Card key={order.id} className="border-border bg-card overflow-hidden">
                           {/* Header details */}
-                          <div className="bg-muted/30 p-5 flex flex-wrap justify-between items-center gap-2 border-b border-border">
+                          <div className="bg-muted/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border">
                             <div>
                               <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
                               <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
@@ -1187,7 +1304,7 @@ export default function CustomerDashboard() {
                                 {order.status}
                               </span>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
                               {/* 1-Minute Cancellation */}
                               {order.status === 'SELECTED' && remainingSec > 0 && (
                                 <Button 

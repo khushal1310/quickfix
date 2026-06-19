@@ -176,6 +176,9 @@ class MockChannel {
   }
 }
 
+// In-memory cache for mock uploads to preserve actual uploaded files as Base64 Data URLs
+const mockFileUrls: Record<string, string> = {};
+
 class MockStorage {
   private bucket: string;
 
@@ -184,6 +187,19 @@ class MockStorage {
   }
 
   async upload(path: string, file: File) {
+    try {
+      if (typeof window !== 'undefined') {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+        });
+        mockFileUrls[path] = base64;
+      }
+    } catch (e) {
+      console.error('[QuickFix Storage Simulator] Failed to read uploaded file:', e);
+    }
     return { data: { path }, error: null };
   }
 
@@ -192,7 +208,11 @@ class MockStorage {
     if (this.bucket === 'profile-images') {
       return { data: { publicUrl: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(path)}` } };
     }
-    // Return neat Unsplash photos for requests
+    // Return the cached Base64 data URL of the customer's actual photo if uploaded
+    if (mockFileUrls[path]) {
+      return { data: { publicUrl: mockFileUrls[path] } };
+    }
+    // Return neat Unsplash photos for requests as a fallback
     const unsplashPics = [
       'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1504148455328-c376907d081c?w=500&auto=format&fit=crop',
