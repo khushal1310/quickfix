@@ -93,46 +93,38 @@ function getProviderBadge(count: number) {
   return null;
 }
 
+// Haversine formula to calculate distance in km
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; // Distance in km
+  return d;
+}
+
 // Live tracking simulator component
 function LiveTrackingSimulator({ order }: { order: any }) {
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick(t => t + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const startTime = new Date(order.created_at || order.started_at || new Date()).getTime();
-  const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
-  
-  // ETA starts at 5 minutes (300 seconds) and counts down
-  const totalTripSec = 300; 
-  const remainingSec = Math.max(0, totalTripSec - elapsedSec);
-  const etaMin = Math.floor(remainingSec / 60);
-  const etaSec = remainingSec % 60;
-  const etaStr = remainingSec > 0 ? `${etaMin}:${etaSec < 10 ? '0' : ''}${etaSec}` : 'Arrived';
-  
-  const progressPercent = Math.min(100, (elapsedSec / totalTripSec) * 100);
-
-  // Start location is the provider's registered location
-  const startLat = order.provider?.latitude || 23.0240;
-  const startLng = order.provider?.longitude || 72.5720;
+  // Provider's real location (fetched from DB)
+  const currentLat = order.provider?.latitude || 23.0240;
+  const currentLng = order.provider?.longitude || 72.5720;
   
   // Target location is the customer's request location
   const destLat = order.request?.latitude || 23.0225;
   const destLng = order.request?.longitude || 72.5714;
-  
-  // Interpolate provider's current coordinates based on progress percent
-  const currentLat = startLat + (destLat - startLat) * (progressPercent / 100);
-  const currentLng = startLng + (destLng - startLng) * (progressPercent / 100);
 
-  const etaText = remainingSec > 0 ? `${etaMin} mins away from you` : 'Arrived';
+  const distance = getDistanceKm(currentLat, currentLng, destLat, destLng);
+  // Estimate ETA at 30km/h (2 minutes per km)
+  const etaMin = distance > 0.05 ? Math.max(1, Math.round(distance * 2)) : 0;
+  const etaText = etaMin > 0 ? `${etaMin} mins away from you (${distance.toFixed(2)} km)` : 'Arrived at destination';
   
   return (
     <div className="space-y-4">
-      {/* Map Header / Live Route Map (Zomato/Swiggy style) */}
+      {/* Map Header / Live Route Map */}
       <div className="relative mt-2">
         <LeafletMap
           providerLat={currentLat}
@@ -149,10 +141,10 @@ function LiveTrackingSimulator({ order }: { order: any }) {
         </div>
       </div>
 
-      {/* Swiggy Style Order details card */}
+      {/* QuickFix Style Order details card */}
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
         
-        {/* Restaurant Header style */}
+        {/* Card Header */}
         <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
           <div>
             <h4 className="text-base font-black text-foreground flex items-center gap-1.5">
@@ -164,7 +156,7 @@ function LiveTrackingSimulator({ order }: { order: any }) {
             <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Category: {order.request?.category?.name || 'Service provider'}</p>
           </div>
           <span className="text-[10px] font-black bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full">
-            Active order
+            Active Booking
           </span>
         </div>
 
@@ -172,13 +164,13 @@ function LiveTrackingSimulator({ order }: { order: any }) {
         <div className="p-4 space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex gap-2.5 items-start">
-              {/* Veg icon decoration */}
-              <div className="w-4 h-4 border border-green-600 rounded flex items-center justify-center shrink-0 mt-0.5">
-                <div className="w-2 h-2 bg-green-600 rounded-full" />
+              {/* Service Icon */}
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Wrench className="h-4 w-4 text-primary" />
               </div>
               <div>
                 <span className="text-sm font-black text-foreground block">
-                  1x {order.request?.category?.name || 'Service Task'}
+                  Service Type: {order.request?.category?.name || 'Service Task'}
                 </span>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed font-semibold">
                   {order.request?.description}
@@ -212,12 +204,11 @@ function LiveTrackingSimulator({ order }: { order: any }) {
             <div className="flex items-start gap-2.5">
               <Clock className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
               <div>
-                <span className="text-foreground font-black block">Delivery in {remainingSec > 0 ? `${etaMin} mins` : 'Arrived'}</span>
+                <span className="text-foreground font-black block">Arrival Status</span>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">
-                  {progressPercent < 30 ? 'Partner has accepted match and is preparing tools...' :
-                   progressPercent < 75 ? 'Partner is driving towards your location...' :
-                   progressPercent < 100 ? 'Partner is arriving in your street now...' :
-                   'Partner has arrived!'}
+                  {distance > 2.0 ? 'Partner is driving towards your location...' :
+                   distance > 0.05 ? 'Partner is nearby in your street...' :
+                   'Partner has arrived at destination!'}
                 </span>
               </div>
             </div>
@@ -225,7 +216,7 @@ function LiveTrackingSimulator({ order }: { order: any }) {
             <div className="flex items-start gap-2.5">
               <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <div>
-                <span className="text-foreground font-black block">Delivery at Home</span>
+                <span className="text-foreground font-black block">Service Location</span>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">
                   {order.request?.area}, {order.request?.city}
                 </span>
@@ -247,8 +238,10 @@ function LiveTrackingSimulator({ order }: { order: any }) {
                 <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
               </svg>
               <div>
-                <span className="text-foreground font-black block">Total Payout bill: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}</span>
-                <span className="text-[10px] text-muted-foreground block mt-0.5">Incl. platform service taxes and charges</span>
+                <span className="text-foreground font-black block">Service Pricing Breakdown</span>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">
+                  Total Budget: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'} (Service Fee + Platform Charges Included)
+                </span>
               </div>
             </div>
 

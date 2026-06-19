@@ -160,21 +160,13 @@ export default function ProviderDashboard() {
     const custLat = order.request?.latitude || 23.0225;
     const custLng = order.request?.longitude || 72.5714;
 
-    const startLat = order.provider?.latitude || providerLat || 23.0240;
-    const startLng = order.provider?.longitude || providerLng || 72.5720;
+    const lat = providerLat || order.provider?.latitude || 23.0240;
+    const lng = providerLng || order.provider?.longitude || 72.5720;
 
-    const startTime = new Date(order.created_at || order.started_at || new Date()).getTime();
-    const elapsedSec = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-    
-    // Trip lasts 5 minutes (300 seconds)
-    const totalTripSec = 300;
-    const progressPercent = Math.min(100, (elapsedSec / totalTripSec) * 100);
-
-    const lat = startLat + (custLat - startLat) * (progressPercent / 100);
-    const lng = startLng + (custLng - startLng) * (progressPercent / 100);
-
-    const remainingSec = Math.max(0, totalTripSec - elapsedSec);
-    const etaMin = Math.floor(remainingSec / 60);
+    const distance = getDistanceKm(lat, lng, custLat, custLng);
+    // Estimate ETA at 30km/h (2 minutes per km)
+    const etaMin = distance > 0.05 ? Math.max(1, Math.round(distance * 2)) : 0;
+    const progressPercent = distance > 0.05 ? Math.max(0, Math.min(95, (1 - distance / 5) * 100)) : 100;
 
     return { lat, lng, progressPercent, etaMin };
   };
@@ -190,29 +182,38 @@ export default function ProviderDashboard() {
   }, []);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setProviderLat(latitude);
-          setProviderLng(longitude);
+    if (!navigator.geolocation) return;
 
-          // Silently update provider coordinates in database
-          if (user) {
-            await supabase
-              .from('users')
-              .update({
-                latitude,
-                longitude
-              })
-              .eq('id', user.id);
-          }
-        },
-        (err) => {
-          console.warn('Provider geolocation unavailable, falling back to Bob coordinates.', err);
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setProviderLat(latitude);
+        setProviderLng(longitude);
+
+        // Silently update provider coordinates in database
+        if (user) {
+          await supabase
+            .from('users')
+            .update({
+              latitude,
+              longitude
+            })
+            .eq('id', user.id);
         }
-      );
-    }
+      },
+      (err) => {
+        console.warn('Provider geolocation watch error:', err);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [user]);
 
   // Fetch all provider data
@@ -475,6 +476,45 @@ export default function ProviderDashboard() {
       toastError(err.message || 'An error occurred.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Debug/Test mock movement towards customer location
+  const handleMockMove = async (order: any, fraction: number) => {
+    const custLat = order.request?.latitude || 23.0225;
+    const custLng = order.request?.longitude || 72.5714;
+
+    const currentLat = providerLat;
+    const currentLng = providerLng;
+
+    let newLat, newLng;
+    if (fraction >= 1.0) {
+      newLat = custLat;
+      newLng = custLng;
+    } else {
+      // Linear step towards customer coordinates
+      newLat = currentLat + (custLat - currentLat) * fraction;
+      newLng = currentLng + (custLng - currentLng) * fraction;
+    }
+
+    setProviderLat(newLat);
+    setProviderLng(newLng);
+
+    if (user) {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          latitude: newLat,
+          longitude: newLng
+        })
+        .eq('id', user.id);
+      
+      if (error) {
+        toastError('Failed to update mock location in DB.');
+      } else {
+        toastSuccess(`Location updated! Moved closer to customer.`);
+        fetchProviderData();
+      }
     }
   };
 
@@ -784,6 +824,11 @@ export default function ProviderDashboard() {
                       const { lat, lng, progressPercent, etaMin } = getInterpolatedCoordinates(order);
                       const custLat = order.request?.latitude || 23.0225;
                       const custLng = order.request?.longitude || 72.5714;
+                      const distance = getDistanceKm(lat, lng, custLat, custLng);
+
+                      const budgetVal = order.request?.budget || 0;
+                      const platformCommission = Math.round(budgetVal * 0.10);
+                      const netEarnings = budgetVal - platformCommission;
 
                       return (
                         <Card key={order.id} className="border-border bg-card overflow-hidden">
@@ -848,11 +893,48 @@ export default function ProviderDashboard() {
                               {/* Floating ETA Label Overlay */}
                               <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
                                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                                {etaMin > 0 ? `${etaMin} mins away from customer` : 'Arrived'}
+                                {etaMin > 0 ? `${etaMin} mins away from customer (${distance.toFixed(2)} km)` : 'Arrived'}
                               </div>
                             </div>
 
-                            {/* Swiggy style customer & item details sheet */}
+                            {/* Debug / Simulator Control Panel (only visible for active testing) */}
+                            <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 text-xs space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-amber-800 dark:text-amber-300">🛠️ Location Simulator (Test Mode):</span>
+                                <span className="text-[10px] text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded-full font-black">ACTIVE</span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground leading-normal">
+                                Since you are testing, you can mock moving closer to the customer. Clicking these buttons will update your location in the database in real-time.
+                              </p>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                <Button 
+                                  size="xs" 
+                                  variant="outline" 
+                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
+                                  onClick={() => handleMockMove(order, 0.25)}
+                                >
+                                  Move 250m Closer 🛵
+                                </Button>
+                                <Button 
+                                  size="xs" 
+                                  variant="outline" 
+                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
+                                  onClick={() => handleMockMove(order, 0.50)}
+                                >
+                                  Move 500m Closer 🛵
+                                </Button>
+                                <Button 
+                                  size="xs" 
+                                  variant="outline" 
+                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
+                                  onClick={() => handleMockMove(order, 1.0)}
+                                >
+                                  Arrived (At Customer) 🏠
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* QuickFix style customer & item details sheet */}
                             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
                               
                               {/* Card Header */}
@@ -870,13 +952,13 @@ export default function ProviderDashboard() {
                               <div className="p-4 space-y-4">
                                 <div className="flex items-start justify-between">
                                   <div className="flex gap-2.5 items-start">
-                                    {/* Veg Icon decoration */}
-                                    <div className="w-4 h-4 border border-green-600 rounded flex items-center justify-center shrink-0 mt-0.5">
-                                      <div className="w-2 h-2 bg-green-600 rounded-full" />
+                                    {/* Service Icon */}
+                                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                                      <Wrench className="h-4 w-4 text-primary" />
                                     </div>
                                     <div>
                                       <span className="text-sm font-black text-foreground block">
-                                        1x {order.request?.category?.name || 'Service Task'}
+                                        Service Type: {order.request?.category?.name || 'Service Task'}
                                       </span>
                                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed font-semibold">
                                         {order.request?.description}
@@ -910,11 +992,10 @@ export default function ProviderDashboard() {
                                   <div className="flex items-start gap-2.5">
                                     <Clock className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
                                     <div>
-                                      <span className="text-foreground font-black block">Delivery in {etaMin > 0 ? `${etaMin} mins` : 'Arrived'}</span>
+                                      <span className="text-foreground font-black block">Arrival Status</span>
                                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                        {progressPercent < 30 ? 'Preparing tools and starting route...' :
-                                         progressPercent < 75 ? 'Driving toward customer location...' :
-                                         progressPercent < 100 ? 'Arriving at customer street now...' :
+                                        {distance > 2.0 ? 'Driving toward customer location...' :
+                                         distance > 0.05 ? 'Arriving at customer street now...' :
                                          'Arrived at destination!'}
                                       </span>
                                     </div>
@@ -946,8 +1027,10 @@ export default function ProviderDashboard() {
                                       <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
                                     </svg>
                                     <div>
-                                      <span className="text-foreground font-black block">Total Payout bill: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}</span>
-                                      <span className="text-[10px] text-muted-foreground block mt-0.5">Incl. platform service taxes and charges</span>
+                                      <span className="text-foreground font-black block">Service Pricing Breakdown</span>
+                                      <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                        Total Budget: {formatCurrency(budgetVal)} | Net Payout (90%): <strong>{formatCurrency(netEarnings)}</strong> (Commission Deducted)
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
