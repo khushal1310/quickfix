@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
       mobileNumber: newUser.mobile_number,
       profileImage: newUser.profile_image,
       createdAt: newUser.created_at,
+      dob: newUser.dob || null,
     };
 
     const response = NextResponse.json({

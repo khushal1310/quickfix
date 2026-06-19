@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
       mobileNumber: userRecord.mobile_number,
       profileImage: userRecord.profile_image,
       createdAt: userRecord.created_at,
+      dob: userRecord.dob || null,
     };
 
     const response = NextResponse.json({

@@ -56,6 +56,7 @@ interface UserDBDetails {
   verificationStatus: 'verified' | 'pending' | 'unverified';
   kycStatus: 'verified' | 'pending' | 'unverified';
   completedOrdersCount?: number;
+  serviceCategory?: string;
 }
 
 // Resolver for provider badges
@@ -98,6 +99,7 @@ export default function AccountPage() {
   const [editMobile, setEditMobile] = useState('');
   const [editImage, setEditImage] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editServiceCategory, setEditServiceCategory] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -156,7 +158,8 @@ export default function AccountPage() {
           rating: userRecord.rating || 4.8,
           verificationStatus: userRecord.verification_status || 'unverified',
           kycStatus: userRecord.kyc_status || 'unverified',
-          completedOrdersCount: userRecord.completed_orders_count || 0
+          completedOrdersCount: userRecord.completed_orders_count || 0,
+          serviceCategory: userRecord.service_category || '',
         };
         setProfile(profileDetails);
 
@@ -165,6 +168,7 @@ export default function AccountPage() {
         setEditMobile(profileDetails.mobileNumber);
         setEditImage(profileDetails.profileImage);
         setEditEmail(profileDetails.email || '');
+        setEditServiceCategory(profileDetails.serviceCategory || '');
       } else {
         // User record was deleted or reset from MongoDB, log out to prevent blank page
         console.warn('User record not found in MongoDB. Logging out...');
@@ -219,14 +223,20 @@ export default function AccountPage() {
 
     setModalLoading(true);
     try {
+      const updateData: any = {
+        full_name: editName,
+        mobile_number: editMobile,
+        profile_image: editImage,
+        email: editEmail
+      };
+
+      if (profile?.role === 'provider') {
+        updateData.service_category = editServiceCategory;
+      }
+
       const { error } = await supabase
         .from('users')
-        .update({
-          full_name: editName,
-          mobile_number: editMobile,
-          profile_image: editImage,
-          email: editEmail
-        })
+        .update(updateData)
         .eq('id', authUser?.id);
 
       if (error) throw error;
@@ -238,6 +248,9 @@ export default function AccountPage() {
         u.fullName = editName;
         u.mobileNumber = editMobile;
         u.profileImage = editImage;
+        if (profile?.role === 'provider') {
+          u.serviceCategory = editServiceCategory;
+        }
         localStorage.setItem('qf_user', JSON.stringify(u));
       }
 
@@ -601,9 +614,14 @@ export default function AccountPage() {
                   {profile.role === 'provider' && (() => {
                     const badge = getProviderBadge(profile.completedOrdersCount || 0);
                     return (
-                      <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded border ${badge.color}`}>
-                        {badge.label}
-                      </span>
+                      <>
+                        <span className={`px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded border ${badge.color}`}>
+                          {badge.label}
+                        </span>
+                        <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400">
+                          {profile.serviceCategory || 'Professional'}
+                        </span>
+                      </>
                     );
                   })()}
                 </div>
@@ -962,6 +980,24 @@ export default function AccountPage() {
                       placeholder="https://example.com/avatar.jpg"
                     />
                   </div>
+                  {profile.role === 'provider' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Service Category</label>
+                      <select 
+                        value={editServiceCategory}
+                        onChange={(e) => setEditServiceCategory(e.target.value)}
+                        className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
+                        required
+                      >
+                        <option value="Cleaning">Cleaning</option>
+                        <option value="Plumbing">Plumbing</option>
+                        <option value="Electrician">Electrician</option>
+                        <option value="Appliance Repair">Appliance Repair</option>
+                        <option value="Painting">Painting</option>
+                        <option value="Pest Control">Pest Control</option>
+                      </select>
+                    </div>
+                  )}
 
                   <Button type="submit" className="w-full rounded-xl mt-4 font-bold" disabled={modalLoading}>
                     {modalLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}

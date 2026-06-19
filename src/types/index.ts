@@ -10,6 +10,7 @@ export interface User {
   profileImage: string | null;
   isSuspended?: boolean;
   createdAt: string;
+  dob?: string | null;
 }
 
 export interface ServiceCategory {
