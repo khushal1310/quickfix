@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { 
   Briefcase, Wallet, Clock, CheckCircle, ArrowRight, Loader2, 
-  MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft, ArrowLeft
+  MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft, ArrowLeft,
+  History, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
@@ -140,6 +141,7 @@ export default function ProviderDashboard() {
   const [nearbyRequests, setNearbyRequests] = useState<any[]>([]);
   const [acceptedRequestsIds, setAcceptedRequestsIds] = useState<string[]>([]);
   const [assignedOrders, setAssignedOrders] = useState<any[]>([]);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   // Track dismissed alert popups (so they don't reappear)
   const [dismissedPopups, setDismissedPopups] = useState<string[]>([]);
@@ -758,235 +760,301 @@ export default function ProviderDashboard() {
           </div>
         )}
 
-        {activeTab === 'assigned' && (
-          // Assigned/Ongoing Jobs
-          <div className="space-y-6" id="assigned-jobs">
-            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-secondary" />
-              Assigned Job Orders ({assignedOrders.length})
-            </h3>
+        {activeTab === 'assigned' && (() => {
+          const activeOrders = assignedOrders.filter(o => o.status === 'SELECTED' || o.status === 'IN_PROGRESS');
+          const completedOrders = assignedOrders.filter(o => o.status === 'COMPLETED' || o.status === 'AUTOCOMPLETED' || o.status === 'CANCELLED');
 
-            {assignedOrders.length === 0 ? (
-              <Card className="border-border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">No assigned jobs yet. Accept nearby requests to match with customers.</p>
-              </Card>
-            ) : (
-              <div className="space-y-6">
-                {assignedOrders.map((order) => {
-                  const isActive = order.status === 'SELECTED' || order.status === 'IN_PROGRESS';
-                  const { lat, lng, progressPercent, etaMin } = getInterpolatedCoordinates(order);
-                  const custLat = order.request?.latitude || 23.0225;
-                  const custLng = order.request?.longitude || 72.5714;
+          return (
+            // Assigned/Ongoing Jobs
+            <div className="space-y-8" id="assigned-jobs">
+              {/* Active Jobs Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-secondary" />
+                  Active Assigned Jobs ({activeOrders.length})
+                </h3>
 
-                  return (
-                    <Card key={order.id} className="border-border bg-card overflow-hidden">
-                      {/* Header bar */}
-                      <div className="bg-muted/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border">
-                        <div>
-                          <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
-                          <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
-                            order.status === 'SELECTED' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                            order.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                            order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                            order.status === 'AUTOCOMPLETED' ? 'bg-teal-500/10 text-teal-500 border-teal-500/20' :
-                            'bg-red-500/10 text-red-500 border-red-500/20'
-                          }`}>
-                            {order.status}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                          {/* Chat Link */}
-                          <Link href={`/chat/${order.id}`}>
-                            <Button size="sm" variant="outline" className="rounded-lg border-border text-foreground hover:bg-muted font-bold flex items-center gap-1.5">
-                              <MessageSquare className="h-4 w-4 text-primary" />
-                              Customer Chat
-                            </Button>
-                          </Link>
+                {activeOrders.length === 0 ? (
+                  <Card className="border-border bg-card p-12 text-center text-muted-foreground">
+                    <p className="text-sm">No active ongoing jobs. Accept nearby requests to match with customers.</p>
+                  </Card>
+                ) : (
+                  <div className="space-y-6">
+                    {activeOrders.map((order) => {
+                      const { lat, lng, progressPercent, etaMin } = getInterpolatedCoordinates(order);
+                      const custLat = order.request?.latitude || 23.0225;
+                      const custLng = order.request?.longitude || 72.5714;
 
-                          {/* Start Work button */}
-                          {order.status === 'SELECTED' && (
-                            <Button 
-                              size="sm" 
-                              className="rounded-lg bg-primary text-white hover:bg-primary/95 font-bold"
-                              onClick={() => handleStartWork(order.id)}
-                            >
-                              Start Work
-                            </Button>
-                          )}
-
-                          {/* Mark complete button */}
-                          {order.status === 'IN_PROGRESS' && (
-                            <Button 
-                              size="sm" 
-                              className="rounded-lg bg-green-500 text-white hover:bg-green-600 font-bold"
-                              onClick={() => handleMarkCompleted(order.id)}
-                            >
-                              Mark Work Completed
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Swiggy Style Active Order tracker (Only for SELECTED / IN_PROGRESS) */}
-                      {isActive ? (
-                        <div className="p-5 space-y-4">
-                          {/* Map Visualizer */}
-                          <div className="relative">
-                            <LeafletMap
-                              providerLat={lat}
-                              providerLng={lng}
-                              customerLat={custLat}
-                              customerLng={custLng}
-                              orderId={order.id}
-                            />
-                            {/* Floating ETA Label Overlay */}
-                            <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
-                              <span className="w-2 h-2 rounded-full bg-green-500" />
-                              {etaMin > 0 ? `${etaMin} mins away from customer` : 'Arrived'}
-                            </div>
-                          </div>
-
-                          {/* Swiggy style customer & item details sheet */}
-                          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
-                            
-                            {/* Card Header */}
-                            <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
-                              <div>
-                                <h4 className="text-base font-black text-foreground">QuickFix Assigned Task</h4>
-                                <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Category: {order.request?.category?.name || 'Service Task'}</p>
-                              </div>
-                              <span className="text-[10px] font-black bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full">
-                                Ongoing Match
-                              </span>
-                            </div>
-
-                            {/* Details items list */}
-                            <div className="p-4 space-y-4">
-                              <div className="flex items-start justify-between">
-                                <div className="flex gap-2.5 items-start">
-                                  {/* Veg Icon decoration */}
-                                  <div className="w-4 h-4 border border-green-600 rounded flex items-center justify-center shrink-0 mt-0.5">
-                                    <div className="w-2 h-2 bg-green-600 rounded-full" />
-                                  </div>
-                                  <div>
-                                    <span className="text-sm font-black text-foreground block">
-                                      1x {order.request?.category?.name || 'Service Task'}
-                                    </span>
-                                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed font-semibold">
-                                      {order.request?.description}
-                                    </p>
-                                    
-                                    {/* Real photos uploaded by customer (NO DUMMY) */}
-                                    {order.request?.request_images && order.request.request_images.length > 0 && (
-                                      <div className="flex gap-1.5 mt-2.5">
-                                        {order.request.request_images.map((img: any, i: number) => (
-                                          <img 
-                                            key={i} 
-                                            src={img.image_url} 
-                                            alt="reference photo" 
-                                            className="h-14 w-14 rounded-lg object-cover border border-border cursor-zoom-in shrink-0"
-                                            onClick={() => window.open(img.image_url, '_blank')}
-                                          />
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                <span className="text-sm font-bold text-foreground">
-                                  {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}
-                                </span>
-                              </div>
-
-                              <div className="h-[1px] bg-border/50" />
-
-                              {/* Progress details list */}
-                              <div className="space-y-3.5 text-xs font-semibold text-muted-foreground">
-                                <div className="flex items-start gap-2.5">
-                                  <Clock className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
-                                  <div>
-                                    <span className="text-foreground font-black block">Delivery in {etaMin > 0 ? `${etaMin} mins` : 'Arrived'}</span>
-                                    <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                      {progressPercent < 30 ? 'Preparing tools and starting route...' :
-                                       progressPercent < 75 ? 'Driving toward customer location...' :
-                                       progressPercent < 100 ? 'Arriving at customer street now...' :
-                                       'Arrived at destination!'}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-start gap-2.5">
-                                  <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                                  <div>
-                                    <span className="text-foreground font-black block">Customer Service Location</span>
-                                    <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                      {order.request?.area}, {order.request?.city}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-start gap-2.5">
-                                  <Phone className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                                  <div>
-                                    <span className="text-foreground font-black block">Customer Details</span>
-                                    <span className="text-[10px] text-muted-foreground block mt-0.5 select-all flex items-center gap-2">
-                                      <span>Name: {order.customer?.full_name} | Mobile: {order.customer?.mobile_number}</span>
-                                      <a href={`tel:${order.customer?.mobile_number}`} className="text-green-600 hover:text-green-700 underline font-bold inline-flex items-center gap-0.5 shrink-0">Call 📞</a>
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-start gap-2.5">
-                                  <svg className="h-4 w-4 text-purple-500 shrink-0 mt-0.5 fill-current" viewBox="0 0 24 24">
-                                    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                                  </svg>
-                                  <div>
-                                    <span className="text-foreground font-black block">Total Payout bill: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}</span>
-                                    <span className="text-[10px] text-muted-foreground block mt-0.5">Incl. platform service taxes and charges</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Simple details for completed/cancelled orders */
-                        <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                          <div className="flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-base border border-primary/20">
-                              {(order.customer?.full_name || 'QF').slice(0, 2).toUpperCase()}
-                            </div>
+                      return (
+                        <Card key={order.id} className="border-border bg-card overflow-hidden">
+                          {/* Header bar */}
+                          <div className="bg-muted/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border">
                             <div>
-                              <h4 className="text-base font-bold text-foreground">{order.customer?.full_name}</h4>
-                              <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1">
-                                  <Phone className="h-3 w-3 text-green-500" />
-                                  Phone: <span className="font-bold text-green-600 select-all">{order.customer?.mobile_number}</span>
+                              <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
+                              <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
+                                order.status === 'SELECTED' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                order.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                order.status === 'AUTOCOMPLETED' ? 'bg-teal-500/10 text-teal-500 border-teal-500/20' :
+                                'bg-red-500/10 text-red-500 border-red-500/20'
+                              }`}>
+                                {order.status}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                              {/* Chat Link */}
+                              <Link href={`/chat/${order.id}`}>
+                                <Button size="sm" variant="outline" className="rounded-lg border-border text-foreground hover:bg-muted font-bold flex items-center gap-1.5">
+                                  <MessageSquare className="h-4 w-4 text-primary" />
+                                  Customer Chat
+                                </Button>
+                              </Link>
+
+                              {/* Start Work button */}
+                              {order.status === 'SELECTED' && (
+                                <Button 
+                                  size="sm" 
+                                  className="rounded-lg bg-primary text-white hover:bg-primary/95 font-bold"
+                                  onClick={() => handleStartWork(order.id)}
+                                >
+                                  Start Work
+                                </Button>
+                              )}
+
+                              {/* Mark complete button */}
+                              {order.status === 'IN_PROGRESS' && (
+                                <Button 
+                                  size="sm" 
+                                  className="rounded-lg bg-green-500 text-white hover:bg-green-600 font-bold"
+                                  onClick={() => handleMarkCompleted(order.id)}
+                                >
+                                  Mark Work Completed
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Swiggy Style Active Order tracker */}
+                          <div className="p-5 space-y-4">
+                            {/* Map Visualizer */}
+                            <div className="relative">
+                              <LeafletMap
+                                providerLat={lat}
+                                providerLng={lng}
+                                customerLat={custLat}
+                                customerLng={custLng}
+                                orderId={order.id}
+                              />
+                              {/* Floating ETA Label Overlay */}
+                              <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
+                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                {etaMin > 0 ? `${etaMin} mins away from customer` : 'Arrived'}
+                              </div>
+                            </div>
+
+                            {/* Swiggy style customer & item details sheet */}
+                            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
+                              
+                              {/* Card Header */}
+                              <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
+                                <div>
+                                  <h4 className="text-base font-black text-foreground">QuickFix Assigned Task</h4>
+                                  <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Category: {order.request?.category?.name || 'Service Task'}</p>
+                                </div>
+                                <span className="text-[10px] font-black bg-primary/10 text-primary border border-primary/20 px-2.5 py-1 rounded-full">
+                                  Ongoing Match
                                 </span>
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="h-3 w-3 text-primary" />
-                                  Address: <span className="font-semibold text-foreground select-all">{order.request?.area}, {order.request?.city}</span>
-                                </span>
+                              </div>
+
+                              {/* Details items list */}
+                              <div className="p-4 space-y-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex gap-2.5 items-start">
+                                    {/* Veg Icon decoration */}
+                                    <div className="w-4 h-4 border border-green-600 rounded flex items-center justify-center shrink-0 mt-0.5">
+                                      <div className="w-2 h-2 bg-green-600 rounded-full" />
+                                    </div>
+                                    <div>
+                                      <span className="text-sm font-black text-foreground block">
+                                        1x {order.request?.category?.name || 'Service Task'}
+                                      </span>
+                                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed font-semibold">
+                                        {order.request?.description}
+                                      </p>
+                                      
+                                      {/* Real photos uploaded by customer (NO DUMMY) */}
+                                      {order.request?.request_images && order.request.request_images.length > 0 && (
+                                        <div className="flex gap-1.5 mt-2.5">
+                                          {order.request.request_images.map((img: any, i: number) => (
+                                            <img 
+                                              key={i} 
+                                              src={img.image_url} 
+                                              alt="reference photo" 
+                                              className="h-14 w-14 rounded-lg object-cover border border-border cursor-zoom-in shrink-0"
+                                              onClick={() => window.open(img.image_url, '_blank')}
+                                            />
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-sm font-bold text-foreground">
+                                    {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}
+                                  </span>
+                                </div>
+
+                                <div className="h-[1px] bg-border/50" />
+
+                                {/* Progress details list */}
+                                <div className="space-y-3.5 text-xs font-semibold text-muted-foreground">
+                                  <div className="flex items-start gap-2.5">
+                                    <Clock className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="text-foreground font-black block">Delivery in {etaMin > 0 ? `${etaMin} mins` : 'Arrived'}</span>
+                                      <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                        {progressPercent < 30 ? 'Preparing tools and starting route...' :
+                                         progressPercent < 75 ? 'Driving toward customer location...' :
+                                         progressPercent < 100 ? 'Arriving at customer street now...' :
+                                         'Arrived at destination!'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-start gap-2.5">
+                                    <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="text-foreground font-black block">Customer Service Location</span>
+                                      <span className="text-[10px] text-muted-foreground block mt-0.5">
+                                        {order.request?.area}, {order.request?.city}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-start gap-2.5">
+                                    <Phone className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="text-foreground font-black block">Customer Details</span>
+                                      <span className="text-[10px] text-muted-foreground block mt-0.5 select-all flex items-center gap-2">
+                                        <span>Name: {order.customer?.full_name} | Mobile: {order.customer?.mobile_number}</span>
+                                        <a href={`tel:${order.customer?.mobile_number}`} className="text-green-600 hover:text-green-700 underline font-bold inline-flex items-center gap-0.5 shrink-0">Call 📞</a>
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-start gap-2.5">
+                                    <svg className="h-4 w-4 text-purple-500 shrink-0 mt-0.5 fill-current" viewBox="0 0 24 24">
+                                      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                                    </svg>
+                                    <div>
+                                      <span className="text-foreground font-black block">Total Payout bill: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open Budget'}</span>
+                                      <span className="text-[10px] text-muted-foreground block mt-0.5">Incl. platform service taxes and charges</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                          <div className="max-w-md">
-                            <span className="text-xs font-bold uppercase text-muted-foreground block">Job description</span>
-                            <p className="text-sm font-medium text-foreground mt-0.5">{order.request?.description}</p>
-                            {order.request?.budget && (
-                              <span className="text-sm font-bold text-primary mt-1 block">
-                                Budget: {formatCurrency(order.request.budget)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </Card>
-                  );
-                })}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Job History Section */}
+              <div className="space-y-4 pt-6 border-t border-border">
+                <button 
+                  onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+                  className="w-full flex items-center justify-between py-2 text-left focus:outline-none hover:opacity-85 transition-opacity"
+                >
+                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <History className="h-5 w-5 text-muted-foreground" />
+                    Job History ({completedOrders.length})
+                  </h3>
+                  <div className="text-muted-foreground">
+                    {isHistoryExpanded ? (
+                      <ChevronUp className="h-5 w-5" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5" />
+                    )}
+                  </div>
+                </button>
+
+                {isHistoryExpanded && (
+                  completedOrders.length === 0 ? (
+                    <Card className="border-border bg-card p-8 text-center text-muted-foreground">
+                      <p className="text-sm">No completed or cancelled jobs found.</p>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {completedOrders.map((order) => {
+                        return (
+                          <Card key={order.id} className="border-border bg-card overflow-hidden">
+                            {/* Header bar */}
+                            <div className="bg-muted/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border">
+                              <div>
+                                <span className="text-xs font-bold uppercase text-muted-foreground block">Order Status</span>
+                                <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${
+                                  order.status === 'SELECTED' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                  order.status === 'IN_PROGRESS' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                                  order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                  order.status === 'AUTOCOMPLETED' ? 'bg-teal-500/10 text-teal-500 border-teal-500/20' :
+                                  'bg-red-500/10 text-red-500 border-red-500/20'
+                                }`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                                {/* Chat Link */}
+                                <Link href={`/chat/${order.id}`}>
+                                  <Button size="sm" variant="outline" className="rounded-lg border-border text-foreground hover:bg-muted font-bold flex items-center gap-1.5">
+                                    <MessageSquare className="h-4 w-4 text-primary" />
+                                    Customer Chat
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+
+                            {/* Simple details for completed/cancelled orders */}
+                            <div className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                              <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-base border border-primary/20">
+                                  {(order.customer?.full_name || 'QF').slice(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h4 className="text-base font-bold text-foreground">{order.customer?.full_name}</h4>
+                                  <div className="flex flex-col gap-0.5 text-xs text-muted-foreground mt-0.5">
+                                    <span className="flex items-center gap-1">
+                                      <Phone className="h-3 w-3 text-green-500" />
+                                      Phone: <span className="font-bold text-green-600 select-all">{order.customer?.mobile_number}</span>
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="h-3 w-3 text-primary" />
+                                      Address: <span className="font-semibold text-foreground select-all">{order.request?.area}, {order.request?.city}</span>
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="max-w-md">
+                                <span className="text-xs font-bold uppercase text-muted-foreground block">Job description</span>
+                                <p className="text-sm font-medium text-foreground mt-0.5">{order.request?.description}</p>
+                                {order.request?.budget && (
+                                  <span className="text-sm font-bold text-primary mt-1 block">
+                                    Budget: {formatCurrency(order.request.budget)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {activeTab === 'wallet' && wallet && (
           // Wallet View
