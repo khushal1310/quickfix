@@ -364,6 +364,47 @@ export default function CustomerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, selectedRequest]);
 
+  // Automatically cancel service requests that have been OPEN or ACCEPTED for more than 5 minutes (300 seconds)
+  useEffect(() => {
+    if (!user || activeRequests.length === 0) return;
+
+    const checkAndCancelExpired = async () => {
+      const expired = activeRequests.filter(req => {
+        if (req.status !== 'OPEN' && req.status !== 'ACCEPTED') return false;
+        
+        // Calculate elapsed seconds since creation
+        const elapsed = (Date.now() - new Date(req.created_at).getTime()) / 1000;
+        return elapsed > 300; // 5 minutes
+      });
+
+      if (expired.length === 0) return;
+
+      let updatedAny = false;
+      for (const req of expired) {
+        try {
+          const { error } = await supabase
+            .from('service_requests')
+            .update({ status: 'CANCELLED' })
+            .eq('id', req.id);
+          
+          if (!error) {
+            updatedAny = true;
+          }
+        } catch (e) {
+          console.error('[QuickFix AutoCancel] Error cancelling expired request:', e);
+        }
+      }
+
+      if (updatedAny) {
+        toastError('Your request was cancelled automatically as no provider accepted it within 5 minutes.');
+        fetchCustomerData();
+      }
+    };
+
+    const interval = setInterval(checkAndCancelExpired, 3000);
+    return () => clearInterval(interval);
+  }, [user, activeRequests]);
+
   const fetchCustomerData = async () => {
     if (!user) return;
     

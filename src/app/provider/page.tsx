@@ -317,9 +317,20 @@ export default function ProviderDashboard() {
       const filteredReqs = reqs.filter(r => {
         if (rejectedIds.includes(r.id)) return false;
         
-        // Radial dispatch logic: <= 10s is 1km limit, > 10s is 5km limit
         const elapsedSeconds = (Date.now() - new Date(r.created_at || new Date()).getTime()) / 1000;
-        const limit = elapsedSeconds <= 10 ? 1.0 : 5.0;
+        
+        // 1. Hide requests older than 5 minutes (300 seconds)
+        if (elapsedSeconds > 300) return false;
+        
+        // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
+        let limit = 5.0;
+        if (elapsedSeconds <= 10) {
+          limit = 1.0;
+        } else if (elapsedSeconds <= 20) {
+          limit = 5.0;
+        } else {
+          limit = 500.0; // Unlimited for cross-city testing
+        }
         
         // If request has coordinates, calculate distance
         if (r.latitude !== undefined && r.longitude !== undefined && providerLat && providerLng) {
@@ -516,7 +527,19 @@ export default function ProviderDashboard() {
     if (dismissedPopups.includes(req.id)) return false;
 
     const elapsedSeconds = (Date.now() - new Date(req.created_at || new Date()).getTime()) / 1000;
-    const limit = elapsedSeconds <= 10 ? 1.0 : 5.0;
+    
+    // 1. Hide requests older than 5 minutes
+    if (elapsedSeconds > 300) return false;
+
+    // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
+    let limit = 5.0;
+    if (elapsedSeconds <= 10) {
+      limit = 1.0;
+    } else if (elapsedSeconds <= 20) {
+      limit = 5.0;
+    } else {
+      limit = 500.0;
+    }
 
     if (req.latitude !== undefined && req.longitude !== undefined && providerLat && providerLng) {
       const dist = getDistanceKm(providerLat, providerLng, req.latitude, req.longitude);
