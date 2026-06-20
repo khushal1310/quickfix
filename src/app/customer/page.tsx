@@ -150,7 +150,7 @@ function LiveTrackingSimulator({ order }: { order: any }) {
             <h4 className="text-base font-black text-foreground flex items-center gap-1.5">
               <span>QuickFix Partner</span>
               <span className="bg-green-600/10 border border-green-500/20 text-green-600 text-[10px] px-1.5 py-0.5 rounded font-black">
-                {order.provider?.rating ? `${order.provider.rating}★` : '4.8★'}
+                {order.provider?.rating ? `${order.provider.rating}★` : 'New'}
               </span>
             </h4>
             <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">Category: {order.request?.category?.name || 'Service provider'}</p>

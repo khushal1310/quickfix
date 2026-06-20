@@ -466,6 +466,13 @@ export default function AccountPage() {
           const { data } = await supabase.from('wallet_transactions').select('*').eq('wallet_id', wallet.id).order('created_at', { ascending: false });
           fetched = data || [];
         }
+      } else if (type === 'reviews-received') {
+        const { data } = await supabase
+          .from('provider_reviews')
+          .select('*, customer:users(*)')
+          .eq('provider_id', authUser.id)
+          .order('created_at', { ascending: false });
+        fetched = data || [];
       }
 
       setModalItems(fetched);
@@ -491,7 +498,8 @@ export default function AccountPage() {
       'active-jobs',
       'pending-requests',
       'completed-jobs',
-      'wallet-history'
+      'wallet-history',
+      'reviews-received'
     ];
     if (lists.includes(modalName)) {
       fetchModalListItems(modalName);
@@ -1182,30 +1190,14 @@ export default function AccountPage() {
 
               {/* 5. MOCK NOTIFICATIONS */}
               {activeModal === 'notifications' && (
-                <div className="space-y-3">
-                  {[
-                    { title: 'Payment Confirmed', body: 'Your platform wallet transaction was processed successfully.', time: '1 hour ago', read: false },
-                    { title: 'Welcome to QuickFix!', body: 'Complete your profile information to verify your background check tag.', time: '1 day ago', read: false },
-                    { title: 'Verification Completed', body: 'Identity document has been verified. Welcome to premium services.', time: '2 days ago', read: true }
-                  ].map((notif, idx) => (
-                    <div key={idx} className={`p-4 rounded-2xl border transition-all ${notif.read ? 'border-border bg-card/40' : 'border-primary/20 bg-primary/5'}`}>
-                      <div className="flex justify-between items-start gap-2">
-                        <h5 className="text-sm font-bold text-foreground">{notif.title}</h5>
-                        <span className="text-[10px] text-muted-foreground font-semibold shrink-0">{notif.time}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-normal">{notif.body}</p>
-                    </div>
-                  ))}
-                  <Button 
-                    variant="outline" 
-                    className="w-full rounded-xl mt-4 font-bold border-border"
-                    onClick={() => {
-                      setUnreadNotifications(0);
-                      toastSuccess('All notifications marked as read.');
-                    }}
-                  >
-                    Mark All as Read
-                  </Button>
+                <div className="space-y-4 text-center py-8 text-muted-foreground">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
+                    <Bell className="h-6 w-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm font-bold text-foreground">No notifications yet</p>
+                  <p className="text-xs text-muted-foreground max-w-[240px] mx-auto leading-normal">
+                    Your real-time updates and service matching notifications will appear here.
+                  </p>
                 </div>
               )}
 
@@ -1523,25 +1515,39 @@ export default function AccountPage() {
               {/* 18. REVIEWS & RATINGS LIST */}
               {activeModal === 'reviews-received' && (
                 <div className="space-y-3">
-                  {[
-                    { author: 'Alice C.', rating: 5, comment: 'Punctual and did an amazing job with cleaning the kitchen! Highly recommended.', date: 'Jun 10, 2026' },
-                    { author: 'Emma W.', rating: 4.5, comment: 'Fixed the lighting circuit board quickly. Reasonable rates.', date: 'Jun 05, 2026' }
-                  ].map((rev, idx) => (
-                    <div key={idx} className="p-4 border border-border bg-card rounded-2xl">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-black text-foreground">{rev.author}</span>
-                        <span className="text-[10px] text-muted-foreground">{rev.date}</span>
-                      </div>
-                      <div className="flex gap-0.5 text-yellow-500 my-2">
-                        {Array.from({ length: Math.floor(rev.rating) }).map((_, i) => (
-                          <Star key={i} className="h-3 w-3 fill-current" />
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-normal italic">
-                        "{rev.comment}"
-                      </p>
+                  {modalItemsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                      <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                      <span className="text-xs text-muted-foreground">Loading reviews...</span>
                     </div>
-                  ))}
+                  ) : modalItems.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Star className="h-8 w-8 mx-auto text-muted-foreground/30 animate-pulse mb-2" />
+                      <p className="text-sm font-semibold">No reviews received yet.</p>
+                      <p className="text-xs">Your completed job ratings and customer feedback will show here.</p>
+                    </div>
+                  ) : (
+                    modalItems.map((rev: any, idx: number) => (
+                      <div key={rev.id || idx} className="p-4 border border-border bg-card rounded-2xl">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-black text-foreground">{rev.customer?.full_name || 'Customer'}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {rev.created_at ? new Date(rev.created_at).toLocaleDateString() : ''}
+                          </span>
+                        </div>
+                        <div className="flex gap-0.5 text-yellow-500 my-2">
+                          {Array.from({ length: Math.floor(Number(rev.rating || 5)) }).map((_, i) => (
+                            <Star key={i} className="h-3 w-3 fill-current" />
+                          ))}
+                        </div>
+                        {rev.comment && (
+                          <p className="text-xs text-muted-foreground leading-normal italic">
+                            "{rev.comment}"
+                          </p>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
