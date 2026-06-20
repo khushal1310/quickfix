@@ -101,6 +101,7 @@ export default function AccountPage() {
   const [editImage, setEditImage] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editServiceCategory, setEditServiceCategory] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -212,6 +213,57 @@ export default function AccountPage() {
       document.documentElement.classList.add('dark');
       localStorage.setItem('theme', 'dark');
       setDark(true);
+    }
+  };
+
+  // Profile Photo Upload & Compression Handler
+  const handleProfilePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Str = event.target?.result as string;
+
+        // Create an image element to compress it on a canvas
+        const img = new Image();
+        img.src = base64Str;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 300; // 300x300 pixel limit for profile avatar
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height *= maxDim / width;
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width *= maxDim / height;
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG format with 0.7 quality to stay under DB constraints
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setEditImage(compressedBase64);
+          toastSuccess('Photo uploaded successfully! Save profile to store changes.');
+        };
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      toastError('Failed to process image file.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -680,20 +732,8 @@ export default function AccountPage() {
           </CardContent>
         </Card>
 
-        {/* 2x2 Quick Action Grid */}
+        {/* Quick Action Grid */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-
-          {/* Messages Link */}
-          <Link 
-            href="/chat" 
-            className="flex flex-col items-start p-4 bg-card hover:bg-muted/30 border border-border rounded-2xl transition-all duration-200 text-left"
-          >
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-500 border border-blue-500/20 mb-3">
-              <MessageSquare className="h-5 w-5" />
-            </div>
-            <span className="text-xs text-muted-foreground font-semibold">Messages</span>
-            <span className="text-xs font-bold text-blue-500 mt-1">Open Chat Rooms</span>
-          </Link>
 
           {/* Notifications Card */}
           <button 
@@ -987,14 +1027,34 @@ export default function AccountPage() {
                       onChange={(e) => setEditEmail(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Avatar Image URL</label>
-                    <Input 
-                      type="url" 
-                      value={editImage}
-                      onChange={(e) => setEditImage(e.target.value)}
-                      placeholder="https://example.com/avatar.jpg"
-                    />
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Profile Photo</label>
+                    <div className="flex items-center gap-4">
+                      <img 
+                        src={editImage || `https://api.dicebear.com/7.x/adventurer/svg?seed=${editName}`} 
+                        alt="Profile preview" 
+                        className="h-16 w-16 rounded-full object-cover border border-border"
+                      />
+                      <label className="cursor-pointer bg-muted hover:bg-muted/80 text-foreground px-4 py-2 rounded-xl text-xs font-black border border-border flex items-center gap-1.5 transition-colors">
+                        {uploadingPhoto ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            Upload Photo
+                          </>
+                        )}
+                        <input 
+                          type="file" 
+                          accept="image/png, image/jpeg, image/jpg" 
+                          className="sr-only" 
+                          onChange={handleProfilePhotoChange} 
+                          disabled={uploadingPhoto}
+                        />
+                      </label>
+                    </div>
                   </div>
                   {profile.role === 'provider' && (
                     <div className="space-y-1">
