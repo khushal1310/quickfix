@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
+import { TiltCard } from '@/components/ui/TiltCard';
 
 // Client-side image resizer and compressor to enable instant uploads
 function compressImage(file: File): Promise<File> {
@@ -981,14 +982,15 @@ export default function CustomerDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Create Service Request Column */}
             <div className="lg:col-span-1 space-y-6">
-              <Card className="border-border bg-card shadow-xs" id="create-request">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5 text-primary" />
-                    Create Request
-                  </CardTitle>
-                  <CardDescription>Post a service request to nearby professionals.</CardDescription>
-                </CardHeader>
+              <TiltCard className="rounded-2xl h-full">
+                <Card className="border-border bg-card shadow-xs h-full" id="create-request">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Plus className="h-5 w-5 text-primary" />
+                      Create Request
+                    </CardTitle>
+                    <CardDescription>Post a service request to nearby professionals.</CardDescription>
+                  </CardHeader>
                 <CardContent>
                   <form onSubmit={handleCreateRequest} className="space-y-4">
                     {/* Category */}
@@ -1297,7 +1299,8 @@ export default function CustomerDashboard() {
                   </form>
                 </CardContent>
               </Card>
-            </div>
+            </TiltCard>
+          </div>
 
             {/* Active Jobs & Requests Column */}
             <div className="lg:col-span-2 space-y-6">
@@ -1315,43 +1318,45 @@ export default function CustomerDashboard() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {activeRequests.map((req) => (
-                      <Card key={req.id} className="border-border bg-card shadow-xs">
-                        <CardHeader className="p-5">
-                          <div className="flex justify-between items-start">
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
-                              {req.category?.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{formatDate(req.created_at)}</span>
-                          </div>
-                          <CardTitle className="text-base font-bold mt-2 truncate">{req.description}</CardTitle>
-                          <CardDescription className="flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            {req.area}, {req.city}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-5 pt-0">
-                          <div className="flex justify-between items-center border-t border-border pt-4 mt-2">
-                            <div>
-                              <span className="text-xs text-muted-foreground block">Estimated Budget</span>
-                              <span className="text-sm font-bold text-foreground">
-                                {req.budget ? formatCurrency(req.budget) : 'N/A'}
+                      <TiltCard key={req.id} className="rounded-2xl h-full">
+                        <Card className="border-border bg-card shadow-xs h-full">
+                          <CardHeader className="p-5">
+                            <div className="flex justify-between items-start">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
+                                {req.category?.name}
                               </span>
+                              <span className="text-xs text-muted-foreground">{formatDate(req.created_at)}</span>
                             </div>
-                            {req.status !== 'OPEN' && req.status !== 'ACCEPTED' && (
-                              <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 py-1 bg-green-500/10 border border-green-500/20 px-3 rounded-full">
-                                <Check className="h-3.5 w-3.5" />
-                                Matched
+                            <CardTitle className="text-base font-bold mt-2 truncate">{req.description}</CardTitle>
+                            <CardDescription className="flex items-center gap-1 mt-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {req.area}, {req.city}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="p-5 pt-0">
+                            <div className="flex justify-between items-center border-t border-border pt-4 mt-2">
+                              <div>
+                                <span className="text-xs text-muted-foreground block">Estimated Budget</span>
+                                <span className="text-sm font-bold text-foreground">
+                                  {req.budget ? formatCurrency(req.budget) : 'N/A'}
+                                </span>
+                              </div>
+                              {req.status !== 'OPEN' && req.status !== 'ACCEPTED' && (
+                                <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 py-1 bg-green-500/10 border border-green-500/20 px-3 rounded-full">
+                                  <Check className="h-3.5 w-3.5" />
+                                  Matched
+                                </div>
+                              )}
+                            </div>
+                            {(req.status === 'OPEN' || req.status === 'ACCEPTED') && (
+                              <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-primary bg-primary/5 border border-primary/20 p-2.5 rounded-xl animate-pulse w-full justify-center">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                <span>Searching for nearby providers within 1km...</span>
                               </div>
                             )}
-                          </div>
-                          {(req.status === 'OPEN' || req.status === 'ACCEPTED') && (
-                            <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-primary bg-primary/5 border border-primary/20 p-2.5 rounded-xl animate-pulse w-full justify-center">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              <span>Searching for nearby providers within 1km...</span>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
+                          </CardContent>
+                        </Card>
+                      </TiltCard>
                     ))}
                   </div>
                 )}

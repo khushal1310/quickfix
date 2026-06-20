@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Sun, Moon, LogOut, LayoutDashboard, Wallet, User as UserIcon } from 'lucide-react';
@@ -40,19 +41,21 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/60 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-8">
         {/* Branding Logo */}
-        <Link href={isAuthenticated && user ? `/${user.role}` : "/"} className="flex items-center gap-2">
-          <span className="insta-gradient p-1.5 rounded-lg text-white">
-            <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0-1.1.9-2 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-            </svg>
-          </span>
-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            QuickFix
-          </span>
-        </Link>
+        <motion.div whileHover={{ scale: 1.04 }} className="flex">
+          <Link href={isAuthenticated && user ? `/${user.role}` : "/"} className="flex items-center gap-2 select-none">
+            <motion.span whileHover={{ rotate: 12 }} className="insta-gradient p-1.5 rounded-lg text-white block">
+              <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0-1.1.9-2 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+              </svg>
+            </motion.span>
+            <span className="text-xl font-black tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              QuickFix
+            </span>
+          </Link>
+        </motion.div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-4">
