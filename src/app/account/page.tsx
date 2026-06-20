@@ -682,19 +682,6 @@ export default function AccountPage() {
 
         {/* 2x2 Quick Action Grid */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {/* Wallet Balance Card */}
-          <button 
-            onClick={() => openDrawerModal(profile.role === 'provider' ? 'wallet-history' : 'wallet-customer')} 
-            className="flex flex-col items-start p-4 bg-card hover:bg-muted/30 border border-border rounded-2xl transition-all duration-200 text-left"
-          >
-            <div className="p-2 rounded-xl bg-green-500/10 text-green-500 border border-green-500/20 mb-3">
-              <Wallet className="h-5 w-5" />
-            </div>
-            <span className="text-xs text-muted-foreground font-semibold">Wallet Balance</span>
-            <span className="text-lg font-black text-foreground mt-0.5">
-              ₹{walletBalance.toFixed(2)}
-            </span>
-          </button>
 
           {/* Messages Link */}
           <Link 
@@ -843,20 +830,7 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* REWARDS SECTION */}
-        <div className="mb-6">
-          <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground mb-2 px-1">Rewards</h3>
-          <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
-            <button onClick={() => openDrawerModal('refer-earn')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
-              <span className="text-sm font-bold text-foreground">Refer &amp; Earn</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-            <button onClick={() => openDrawerModal('promo-codes')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
-              <span className="text-sm font-bold text-foreground">Promo Codes</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </div>
-        </div>
+
 
         {/* SETTINGS SECTION */}
         <div className="mb-6">

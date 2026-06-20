@@ -132,7 +132,7 @@ export default function ProviderDashboard() {
   }, [isAuthenticated, user, authLoading]);
 
   // UI States
-  const [activeTab, setActiveTab] = useState<'nearby' | 'assigned' | 'wallet'>('nearby');
+  const [activeTab, setActiveTab] = useState<'nearby' | 'assigned'>('nearby');
   const [loading, setLoading] = useState(false);
 
   // Data States
@@ -674,15 +674,6 @@ export default function ProviderDashboard() {
             >
               Assigned Jobs ({assignedOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'AUTOCOMPLETED' && o.status !== 'CANCELLED').length})
             </Button>
-            <Button 
-              variant={activeTab === 'wallet' ? 'default' : 'outline'} 
-              onClick={() => setActiveTab('wallet')}
-              className="rounded-xl font-bold flex items-center gap-2"
-              id="wallet-tab"
-            >
-              <Wallet className="h-4 w-4" />
-              Wallet
-            </Button>
           </div>
 
         {!isKycVerified && (
@@ -1139,80 +1130,7 @@ export default function ProviderDashboard() {
           );
         })()}
 
-        {activeTab === 'wallet' && wallet && (
-          // Wallet View
-          <div className="space-y-6" id="wallet">
-            {/* Wallet Balances Card */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-border bg-card p-6 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-bold uppercase text-muted-foreground">Available Amount</span>
-                  <h2 className="text-3xl font-black text-green-500 mt-2">{formatCurrency(wallet.available_amount)}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">Earnings ready to be transferred to your bank.</p>
-              </Card>
 
-              <Card className="border-border bg-card p-6 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-bold uppercase text-muted-foreground">Held Amount</span>
-                  <h2 className="text-3xl font-black text-yellow-500 mt-2">{formatCurrency(wallet.held_amount)}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">Platform fees locked on active assigned jobs.</p>
-              </Card>
-
-              <Card className="border-border bg-card p-6 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-bold uppercase text-muted-foreground">Total Balance</span>
-                  <h2 className="text-3xl font-black text-foreground mt-2">{formatCurrency(wallet.balance)}</h2>
-                </div>
-                <p className="text-xs text-muted-foreground mt-4">Aggregate funds (available + holds).</p>
-              </Card>
-            </div>
-
-            {/* Transaction History */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-bold text-foreground">Transaction Ledger</h3>
-
-              {transactions.length === 0 ? (
-                <Card className="border-border bg-card p-8 text-center text-muted-foreground">
-                  <p className="text-sm">No transactions yet.</p>
-                </Card>
-              ) : (
-                <div className="border border-border rounded-2xl overflow-hidden bg-card">
-                  <div className="divide-y divide-border">
-                    {transactions.map((t) => (
-                      <div key={t.id} className="flex justify-between items-center p-4 hover:bg-muted/10 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${
-                            t.type === 'Credit' ? 'bg-green-500/10 text-green-500' :
-                            t.type === 'Fee Deduction' || t.type === 'Debit' ? 'bg-red-500/10 text-red-500' :
-                            'bg-yellow-500/10 text-yellow-500'
-                          }`}>
-                            {t.type === 'Credit' ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
-                          </div>
-                          <div>
-                            <span className="text-sm font-bold text-foreground block">{t.description}</span>
-                            <span className="text-xs text-muted-foreground">{formatDate(t.created_at)}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className={`text-sm font-bold ${
-                            t.type === 'Credit' ? 'text-green-500' :
-                            t.type === 'Fee Deduction' || t.type === 'Debit' ? 'text-red-500' :
-                            'text-yellow-500'
-                          }`}>
-                            {t.type === 'Credit' ? '+' : '-'}{formatCurrency(t.amount)}
-                          </span>
-                          <span className="text-[10px] uppercase font-bold text-muted-foreground block mt-0.5">{t.type}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </main>
 
       <BottomNav />

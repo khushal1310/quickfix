@@ -332,10 +332,8 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background pb-16 sm:pb-0">
-      <Navbar />
-
-      <main className="mx-auto flex-1 w-full max-w-4xl px-4 py-6 md:py-8 flex flex-col h-[calc(100vh-4rem-4rem)] sm:h-[calc(100vh-4rem)]">
+    <div className="flex h-screen max-h-screen flex-col bg-background overflow-hidden">
+      <main className="mx-auto flex-1 w-full max-w-4xl px-4 py-4 flex flex-col h-full min-h-0 overflow-hidden">
         {/* Back Button & Chat Header */}
         <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
           <div className="flex items-center gap-3">
@@ -496,8 +494,6 @@ export default function ChatRoomPage() {
           </form>
         </Card>
       </main>
-
-      <BottomNav />
     </div>
   );
 }
