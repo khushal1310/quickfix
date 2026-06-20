@@ -330,6 +330,17 @@ export default function LoginPage() {
             <DialogDescription className="text-center text-xs text-muted-foreground mt-1">
               Select one of the pre-linked accounts to continue.
             </DialogDescription>
+            
+            {/* Real OAuth Setup Info Alert */}
+            <div className="mt-3 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 leading-normal space-y-1 text-left">
+              <span className="font-bold block">🛠️ Real Login Setup Required:</span>
+              <p>
+                To fetch real accounts from your device, this app must be registered in the Google Cloud Console &amp; Apple Developer Portal to get a secure Client ID linked to your domain.
+              </p>
+              <p className="font-semibold text-[10px]">
+                Please refer to the <span className="underline">official_app_roadmap.md</span> file in your workspace for setup instructions.
+              </p>
+            </div>
           </DialogHeader>
 
           <div className="space-y-3 my-2 max-h-72 overflow-y-auto pr-1">
