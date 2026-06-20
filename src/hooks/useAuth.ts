@@ -12,8 +12,10 @@ interface AuthState {
   loadSession: () => Promise<void>;
   login: (mobileNumber: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (email: string, name: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
-  register: (fullName: string, mobileNumber: string, password: string, role: 'customer' | 'provider', serviceCategory?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
+  register: (fullName: string, mobileNumber: string, password: string, role: 'customer' | 'provider', serviceCategory?: string, email?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
   verifyOtp: (mobileNumber: string, otpCode: string) => Promise<{ success: boolean; user?: User; error?: string }>;
+  requestLoginOtp: (mobileNumber: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
+  verifyLoginOtp: (mobileNumber: string, otpCode: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   setError: (error: string | null) => void;
 }
@@ -122,13 +124,13 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
   },
 
-  register: async (fullName, mobileNumber, password, role, serviceCategory) => {
+  register: async (fullName, mobileNumber, password, role, serviceCategory, email) => {
     set({ isLoading: true, error: null });
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName, mobileNumber, password, role, serviceCategory }),
+        body: JSON.stringify({ fullName, mobileNumber, password, role, serviceCategory, email }),
       });
       const data = await res.json();
 
@@ -172,6 +174,61 @@ export const useAuth = create<AuthState>((set, get) => ({
       });
 
       return { success: true, user: data.user };
+    } catch (err: any) {
+      set({ error: err.message });
+      return { success: false, error: err.message };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  requestLoginOtp: async (mobileNumber) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch('/api/auth/login-otp-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to request login OTP.');
+      }
+      return { success: true, otp: data.otp };
+    } catch (err: any) {
+      set({ error: err.message });
+      return { success: false, error: err.message };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyLoginOtp: async (mobileNumber, otpCode) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch('/api/auth/login-otp-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileNumber, otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Login OTP verification failed.');
+      }
+
+      localStorage.setItem('qf_token', data.token);
+      document.cookie = `qf_token=${data.token}; path=/; max-age=2592000; SameSite=Strict`;
+      localStorage.setItem('qf_user', JSON.stringify(data.user));
+      await setSupabaseToken(data.token);
+
+      set({
+        token: data.token,
+        user: data.user,
+        isAuthenticated: true,
+        error: null,
+      });
+
+      return { success: true };
     } catch (err: any) {
       set({ error: err.message });
       return { success: false, error: err.message };

@@ -120,8 +120,8 @@ export default function ForgotPasswordPage() {
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
               {step === 1 
-                ? 'Enter your registered mobile number to request a reset code.' 
-                : 'Enter the verification code and choose a new password.'}
+                ? 'Enter your registered mobile number to request a reset code sent to your registered email address.' 
+                : 'Enter the verification code sent to your email and choose a new password.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -164,9 +164,9 @@ export default function ForgotPasswordPage() {
                   <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-4 border border-blue-500/20">
                     <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="text-sm font-bold text-blue-500">SMS Simulator Panel</h4>
+                      <h4 className="text-sm font-bold text-blue-500">Email Simulator Panel</h4>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Use this code to verify: <span className="font-mono font-bold text-blue-500 text-sm select-all">{simulatedOtp}</span>
+                        Use this code (sent to registered email) to verify: <span className="font-mono font-bold text-blue-500 text-sm select-all">{simulatedOtp}</span>
                       </p>
                     </div>
                   </div>

@@ -11,6 +11,12 @@ export interface User {
   isSuspended?: boolean;
   createdAt: string;
   dob?: string | null;
+  custom_user_id?: string;
+  customUserId?: string;
+  selfie_url?: string;
+  kyc_status?: string;
+  verification_status?: string;
+  completed_orders_count?: number;
 }
 
 export interface ServiceCategory {
@@ -133,6 +139,8 @@ export interface Dispute {
   description: string;
   status: 'PENDING' | 'RESOLVED';
   createdAt: string;
+  reporter_custom_id?: string;
+  reported_custom_id?: string;
   
   // Joins
   order?: Order;

@@ -13,7 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   ShieldAlert, Users, Wrench, DollarSign, AlertTriangle, Loader2, 
-  Trash, Plus, Check, Ban, CheckCircle2, Sparkles, Search, Layers, RefreshCw, ArrowLeft
+  Trash, Plus, Check, Ban, CheckCircle2, Sparkles, Search, Layers, RefreshCw, ArrowLeft, XCircle
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
@@ -35,6 +35,10 @@ export default function AdminPanel() {
   const [activeSubTab, setActiveSubTab] = useState<'stats' | 'users' | 'disputes' | 'categories'>('stats');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [allRequests, setAllRequests] = useState<any[]>([]);
+  const [allOrders, setAllOrders] = useState<any[]>([]);
 
   // Analytics Metrics States
   const [metrics, setMetrics] = useState({
@@ -117,6 +121,17 @@ export default function AdminPanel() {
         .select('*')
         .order('name');
       setCategoriesList(cats || []);
+
+      // 6. Fetch All Service Requests & Orders for User Detail View
+      const { data: allReqs } = await supabase
+        .from('service_requests')
+        .select('*, customer:users(*), category:service_categories(*), request_images(*)');
+      setAllRequests(allReqs || []);
+
+      const { data: allOrds } = await supabase
+        .from('orders')
+        .select('*, request:service_requests(*), customer:users(*), provider:users(*)');
+      setAllOrders(allOrds || []);
 
     } catch (err: any) {
       toastError('Error pulling administrative statistics.');
@@ -290,7 +305,8 @@ export default function AdminPanel() {
   const filteredUsers = usersList.filter(u => 
     u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     u.mobile_number.includes(searchQuery) ||
-    u.role.toLowerCase().includes(searchQuery.toLowerCase())
+    u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.custom_user_id && u.custom_user_id.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   if (authLoading || !user) {
@@ -429,7 +445,11 @@ export default function AdminPanel() {
                   <div className="p-8 text-center text-muted-foreground text-sm">No users found.</div>
                 ) : (
                   filteredUsers.map((target) => (
-                    <div key={target.id} className="flex flex-wrap justify-between items-center p-4 hover:bg-muted/10 transition-colors gap-3">
+                    <div 
+                      key={target.id} 
+                      className="flex flex-wrap justify-between items-center p-4 hover:bg-muted/10 transition-colors gap-3 cursor-pointer"
+                      onClick={() => setSelectedUser(target)}
+                    >
                       <div className="flex items-center gap-3">
                         <img
                           src={target.profile_image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${target.full_name}`}
@@ -437,8 +457,13 @@ export default function AdminPanel() {
                           className="h-10 w-10 rounded-full object-cover"
                         />
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-sm text-foreground">{target.full_name}</span>
+                            {target.custom_user_id && (
+                              <span className="text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded">
+                                {target.custom_user_id}
+                              </span>
+                            )}
                             {target.is_suspended && (
                               <span className="text-[10px] font-black uppercase bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded">
                                 Suspended
@@ -461,29 +486,32 @@ export default function AdminPanel() {
                             </span>
                           )}
                           {target.selfie_url && (
-                            <div className="mt-2 flex items-center gap-2.5 bg-muted/50 p-2 rounded-xl border border-border max-w-xs shadow-xs">
+                            <div 
+                              className="mt-2 flex items-center gap-2.5 bg-muted/50 p-2 rounded-xl border border-border max-w-xs shadow-xs"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <img 
                                 src={target.selfie_url} 
                                 alt="Selfie Verification" 
-                                className="h-11 w-11 rounded-lg object-cover border border-border"
+                                className="h-11 w-11 rounded-lg object-cover border border-border cursor-zoom-in hover:scale-105 transition-transform"
+                                onClick={() => setPreviewImage(target.selfie_url)}
                               />
                               <div className="flex flex-col">
                                 <span className="text-[9px] font-black uppercase text-primary tracking-wider leading-none">Security Selfie</span>
-                                <a 
-                                  href={target.selfie_url} 
-                                  target="_blank" 
-                                  rel="noreferrer"
-                                  className="text-[9px] text-blue-500 hover:underline font-bold mt-1 inline-block"
+                                <button 
+                                  type="button"
+                                  className="text-[9px] text-blue-500 hover:underline font-bold mt-1 text-left"
+                                  onClick={() => setPreviewImage(target.selfie_url)}
                                 >
                                   View Full Image
-                                </a>
+                                </button>
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs uppercase font-bold text-muted-foreground px-2 py-0.5 bg-muted rounded border border-border">
                           {target.role}
                         </span>
@@ -542,12 +570,22 @@ export default function AdminPanel() {
                       </div>
                       <div className="grid grid-cols-2 gap-4 border-t border-border pt-3">
                         <div>
-                          <span className="text-[10px] text-muted-foreground uppercase block font-bold">Customer</span>
-                          <span className="text-xs font-bold text-foreground">{disp.order?.customer?.full_name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-bold">Reporter (Customer)</span>
+                          <span className="text-xs font-bold text-foreground block">
+                            {disp.order?.customer?.full_name || 'N/A'}
+                          </span>
+                          <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20 mt-1 inline-block">
+                            ID: {disp.reporter_custom_id || disp.order?.customer?.custom_user_id || 'N/A'}
+                          </span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-muted-foreground uppercase block font-bold">Provider</span>
-                          <span className="text-xs font-bold text-foreground">{disp.order?.provider?.full_name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase block font-bold">Reported (Provider)</span>
+                          <span className="text-xs font-bold text-foreground block">
+                            {disp.order?.provider?.full_name || 'N/A'}
+                          </span>
+                          <span className="text-[9px] font-black text-secondary bg-secondary/10 px-1.5 py-0.5 rounded border border-secondary/20 mt-1 inline-block">
+                            ID: {disp.reported_custom_id || disp.order?.provider?.custom_user_id || 'N/A'}
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -678,6 +716,213 @@ export default function AdminPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Comprehensive User Detail & History Dialog Modal */}
+      <Dialog open={selectedUser !== null} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent className="max-w-2xl border-border bg-card p-6 overflow-y-auto max-h-[85vh]">
+          <DialogHeader className="border-b border-border pb-4">
+            <DialogTitle className="text-xl font-black text-foreground flex items-center gap-3">
+              <div className="flex items-center gap-3">
+                <img
+                  src={selectedUser?.profile_image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${selectedUser?.full_name}`}
+                  alt={selectedUser?.full_name}
+                  className="h-12 w-12 rounded-full object-cover border border-primary/20"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold">{selectedUser?.full_name}</span>
+                    <span className="text-[10px] font-black uppercase bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded">
+                      {selectedUser?.role}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground font-semibold block mt-0.5">
+                    {selectedUser?.custom_user_id || 'No Custom ID'}
+                  </span>
+                </div>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedUser && (
+            <div className="space-y-6 py-4">
+              {/* Profile Details Grid */}
+              <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Mobile Number</span>
+                  <span className="text-sm font-bold text-foreground select-all">{selectedUser.mobile_number}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Date of Birth</span>
+                  <span className="text-sm font-bold text-foreground">{selectedUser.dob || 'Not provided'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Joined On</span>
+                  <span className="text-sm font-bold text-foreground">{formatDate(selectedUser.created_at)}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase block font-bold">Account Status</span>
+                  <span className={`text-xs font-black uppercase px-2 py-0.5 rounded border inline-block mt-0.5 ${
+                    selectedUser.is_suspended ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'
+                  }`}>
+                    {selectedUser.is_suspended ? 'Suspended' : 'Active'}
+                  </span>
+                </div>
+                {selectedUser.role === 'provider' && (
+                  <>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase block font-bold">Service Category</span>
+                      <span className="text-sm font-bold text-foreground capitalize">{selectedUser.service_category || 'Cleaning'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase block font-bold">Rating</span>
+                      <span className="text-sm font-bold text-yellow-500">★ {selectedUser.rating || '5.0'}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Security Selfie Verification */}
+              {selectedUser.role === 'provider' && selectedUser.selfie_url && (
+                <div className="border border-border p-4 bg-muted/20 rounded-2xl">
+                  <span className="text-xs text-foreground uppercase block font-black mb-2">Aadhaar Security Selfie</span>
+                  <div className="flex gap-3 items-center">
+                    <img 
+                      src={selectedUser.selfie_url} 
+                      alt="Verification Selfie" 
+                      className="h-20 w-20 rounded-xl object-cover border border-border cursor-zoom-in hover:scale-105 transition-transform shrink-0"
+                      onClick={() => setPreviewImage(selectedUser.selfie_url)}
+                    />
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground font-semibold leading-normal">
+                        This selfie was uploaded by the provider during Aadhaar verification to match details.
+                      </p>
+                      <Button 
+                        size="xs" 
+                        variant="outline" 
+                        className="rounded-lg h-7 font-bold text-xs"
+                        onClick={() => setPreviewImage(selectedUser.selfie_url)}
+                      >
+                        Preview Selfie Verification
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* History Section */}
+              <div className="border-t border-border pt-4">
+                <h4 className="text-sm font-black text-foreground mb-3">
+                  {selectedUser.role === 'customer' ? 'Service Requests Created' : 'Jobs History'}
+                </h4>
+
+                <div className="space-y-3">
+                  {selectedUser.role === 'customer' ? (
+                    (() => {
+                      const reqs = allRequests.filter(r => r.customer_id === selectedUser.id);
+                      if (reqs.length === 0) {
+                        return <p className="text-xs text-muted-foreground text-center py-4">No service requests found for this customer.</p>;
+                      }
+                      return reqs.map((req) => (
+                        <div key={req.id} className="p-3 border border-border bg-background rounded-xl text-xs font-semibold space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-bold text-foreground line-clamp-1">{req.description}</span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border shrink-0 ${
+                              req.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                              req.status === 'CANCELLED' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                              'bg-primary/10 text-primary border-primary/20'
+                            }`}>
+                              {req.status}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                            <span>Category: {req.category?.name || 'General'} | Budget: {req.budget ? formatCurrency(req.budget) : 'Open'}</span>
+                            <span>{formatDate(req.created_at)}</span>
+                          </div>
+                        </div>
+                      ));
+                    })()
+                  ) : (
+                    (() => {
+                      const ords = allOrders.filter(o => o.provider_id === selectedUser.id);
+                      if (ords.length === 0) {
+                        return <p className="text-xs text-muted-foreground text-center py-4">No jobs assigned or completed yet.</p>;
+                      }
+                      return ords.map((order) => (
+                        <div key={order.id} className="p-3 border border-border bg-background rounded-xl text-xs font-semibold space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-bold text-foreground line-clamp-1">{order.request?.description || 'Service Job'}</span>
+                            <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border shrink-0 ${
+                              order.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                              order.status === 'CANCELLED' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                              'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                            }`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                            <span>Customer: {order.customer?.full_name || 'QuickFix User'} | Payout: {order.request?.budget ? formatCurrency(order.request.budget) : 'Open'}</span>
+                            <span>{formatDate(order.started_at || order.created_at)}</span>
+                          </div>
+                        </div>
+                      ));
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full rounded-xl"
+              onClick={() => setSelectedUser(null)}
+            >
+              Close Details
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Premium Image Preview Lightbox Overlay */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100000] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            type="button" 
+            className="absolute top-4 right-4 rounded-full p-2 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={() => setPreviewImage(null)}
+            aria-label="Close"
+          >
+            <XCircle className="h-7 w-7" />
+          </button>
+          
+          <div 
+            className="relative w-full max-w-4xl max-h-[80vh] flex items-center justify-center p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={previewImage} 
+              alt="Enlarged reference preview" 
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl border border-white/10 shadow-2xl"
+            />
+          </div>
+          
+          <div className="mt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 font-bold hover:text-white"
+              onClick={() => setPreviewImage(null)}
+            >
+              Close Preview
+            </Button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

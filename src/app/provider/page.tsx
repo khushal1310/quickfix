@@ -1287,27 +1287,41 @@ export default function ProviderDashboard() {
 
       {/* Premium Image Preview Lightbox Overlay */}
       {previewImage && (
-        <Dialog open={previewImage !== null} onOpenChange={(open) => !open && setPreviewImage(null)}>
-          <DialogContent className="max-w-3xl border-none bg-black/95 p-1 rounded-2xl shadow-2xl overflow-hidden flex flex-col items-center justify-center z-[99999]">
-            <div className="relative w-full max-h-[85vh] flex items-center justify-center p-2">
-              <img 
-                src={previewImage} 
-                alt="Enlarged reference preview" 
-                className="max-w-full max-h-[75vh] object-contain rounded-lg border border-white/10"
-              />
-            </div>
-            <DialogFooter className="w-full justify-center pb-4 pt-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 font-bold hover:text-white"
-                onClick={() => setPreviewImage(null)}
-              >
-                Close Preview
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <div 
+          className="fixed inset-0 z-[100000] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button 
+            type="button" 
+            className="absolute top-4 right-4 rounded-full p-2 bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={() => setPreviewImage(null)}
+            aria-label="Close"
+          >
+            <XCircle className="h-7 w-7" />
+          </button>
+          
+          <div 
+            className="relative w-full max-w-4xl max-h-[80vh] flex items-center justify-center p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img 
+              src={previewImage} 
+              alt="Enlarged reference preview" 
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl border border-white/10 shadow-2xl"
+            />
+          </div>
+          
+          <div className="mt-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 font-bold hover:text-white"
+              onClick={() => setPreviewImage(null)}
+            >
+              Close Preview
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -901,7 +901,9 @@ export default function CustomerDashboard() {
           order_id: disputeOrder.id,
           reason: disputeReason,
           description: disputeDesc,
-          status: 'PENDING'
+          status: 'PENDING',
+          reporter_custom_id: user.custom_user_id || 'N/A',
+          reported_custom_id: disputeOrder.provider?.custom_user_id || 'N/A'
         });
 
       if (disputeError) throw disputeError;
@@ -1454,8 +1456,15 @@ export default function CustomerDashboard() {
                                 className="h-12 w-12 rounded-full border border-primary/20 object-cover"
                               />
                               <div>
-                                <h4 className="text-base font-bold text-foreground">{order.provider?.full_name}</h4>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="text-base font-bold text-foreground">{order.provider?.full_name}</h4>
+                                  {order.provider?.custom_user_id && (
+                                    <span className="text-[10px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                                      {order.provider.custom_user_id}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                                   {(() => {
                                     const badge = getProviderBadge(order.provider?.completed_orders_count || 0);
                                     if (!badge) return null;
@@ -1573,7 +1582,14 @@ export default function CustomerDashboard() {
                       className="h-10 w-10 rounded-full object-cover"
                     />
                     <div>
-                      <h4 className="text-sm font-bold text-foreground">{acc.provider?.full_name}</h4>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="text-sm font-bold text-foreground">{acc.provider?.full_name}</h4>
+                        {acc.provider?.custom_user_id && (
+                          <span className="text-[9px] font-black text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                            {acc.provider.custom_user_id}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Star className="h-3 w-3 text-yellow-500 fill-current" />
                         <span>4.8 Rating</span>

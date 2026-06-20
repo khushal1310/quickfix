@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const isEmail = mobileNumber.includes('@');
     const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
     
-    let query = supabaseAdmin.from('users').select('id');
+    let query = supabaseAdmin.from('users').select('id, email, mobile_number');
     if (isEmail) {
       query = query.eq('email', inputIdentifier);
     } else {
@@ -30,9 +30,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: isEmail ? 'No user registered with this email address.' : 'No user registered with this mobile number.' }, { status: 404 });
     }
 
+    const email = user.email;
+    if (!email) {
+      return NextResponse.json({ error: 'This account does not have a linked email address. Please contact support.' }, { status: 400 });
+    }
+
     // 2. Generate 4-digit OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log(`[QuickFix SMS Simulator] Password Reset OTP for ${inputIdentifier}: ${otpCode}`);
+    console.log(`[QuickFix Email Simulator] Password Reset OTP for ${email}: ${otpCode}`);
 
     // 3. Store in user_otps table
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'OTP generated successfully. Check logs or verify with code.',
+      message: 'OTP generated successfully. Check your email.',
       otp: otpCode, // Exposed for development/testing ease
     });
   } catch (error: any) {

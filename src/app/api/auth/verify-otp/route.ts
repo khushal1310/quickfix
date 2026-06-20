@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         role: tempUser.role,
         full_name: tempUser.fullName,
         mobile_number: tempUser.mobileNumber,
+        email: tempUser.email || null,
         password_hash: tempUser.passwordHash,
         profile_image: defaultAvatar,
         service_category: tempUser.serviceCategory || null,
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
       role: newUser.role,
       fullName: newUser.full_name,
       mobileNumber: newUser.mobile_number,
+      custom_user_id: newUser.custom_user_id,
     });
 
     // 7. Return user details and token
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
       profileImage: newUser.profile_image,
       createdAt: newUser.created_at,
       dob: newUser.dob || null,
+      custom_user_id: newUser.custom_user_id,
     };
 
     const response = NextResponse.json({

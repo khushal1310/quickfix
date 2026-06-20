@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       role: userRecord.role,
       fullName: userRecord.full_name,
       mobileNumber: userRecord.mobile_number,
+      custom_user_id: userRecord.custom_user_id,
     });
 
     const user = {
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       profileImage: userRecord.profile_image,
       createdAt: userRecord.created_at,
       dob: userRecord.dob || null,
+      custom_user_id: userRecord.custom_user_id,
     };
 
     const response = NextResponse.json({

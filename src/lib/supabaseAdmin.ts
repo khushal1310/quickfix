@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { getDb } from '@/lib/mongodb';
+import { getDb, getNextCustomUserId } from '@/lib/mongodb';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-project.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key';
@@ -121,11 +121,33 @@ class MockAdminQueryBuilder {
         const recordsToInsert = Array.isArray(this.dataObj) ? this.dataObj : [this.dataObj];
         const inserted: any[] = [];
 
+        let nextNum = -1;
         for (const item of recordsToInsert) {
+          let customUserId = item.custom_user_id;
+          if (this.table === 'users' && !customUserId) {
+            if (nextNum === -1) {
+              const lastUser = await mongoDb.collection('users')
+                .find({ custom_user_id: { $regex: /^QF-\d+$/ } })
+                .sort({ custom_user_id: -1 })
+                .limit(1)
+                .toArray();
+              nextNum = 1001;
+              if (lastUser && lastUser.length > 0) {
+                const match = lastUser[0].custom_user_id.match(/^QF-(\d+)$/);
+                if (match) {
+                  nextNum = parseInt(match[1], 10) + 1;
+                }
+              }
+            }
+            customUserId = `QF-${nextNum}`;
+            nextNum++;
+          }
+
           const newRecord = {
             id: item.id || Math.random().toString(36).substring(2, 9),
             created_at: new Date().toISOString(),
-            ...item
+            ...item,
+            ...(this.table === 'users' ? { custom_user_id: customUserId } : {})
           };
           inserted.push(newRecord);
         }

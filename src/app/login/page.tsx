@@ -20,7 +20,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithGoogle, user, isAuthenticated } = useAuth();
+  const { login, loginWithGoogle, requestLoginOtp, verifyLoginOtp, user, isAuthenticated } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
@@ -126,8 +126,68 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  const [authMethod, setAuthMethod] = useState<'password' | 'otp'>('password');
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [simulatedLoginOtp, setSimulatedLoginOtp] = useState<string | null>(null);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (authMethod === 'otp') {
+      if (!otpRequested) {
+        if (mobileNumber.length < 10) {
+          toastError('Please enter a valid 10-digit mobile number.');
+          return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+          const res = await requestLoginOtp(mobileNumber);
+          if (res.success) {
+            setSimulatedLoginOtp(res.otp || null);
+            setOtpRequested(true);
+            toastSuccess('OTP sent to your registered email address!');
+          } else {
+            setErrorMsg(res.error || 'Failed to send OTP.');
+            toastError(res.error || 'Failed to send OTP.');
+          }
+        } catch (err: any) {
+          setErrorMsg(err.message || 'An unexpected error occurred.');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        if (otpCode.length < 4) {
+          toastError('Please enter the 4-digit OTP.');
+          return;
+        }
+        setLoading(true);
+        setErrorMsg(null);
+        try {
+          const res = await verifyLoginOtp(mobileNumber, otpCode);
+          if (res.success) {
+            toastSuccess('Logged in successfully!');
+            const userJson = localStorage.getItem('qf_user');
+            if (userJson) {
+              const userObj = JSON.parse(userJson);
+              router.push(`/${userObj.role}`);
+            } else {
+              router.push('/');
+            }
+          } else {
+            setErrorMsg(res.error || 'OTP verification failed.');
+            toastError(res.error || 'Login OTP verification failed.');
+          }
+        } catch (err: any) {
+          setErrorMsg(err.message || 'An unexpected error occurred.');
+        } finally {
+          setLoading(false);
+        }
+      }
+      return;
+    }
+
     const identifier = loginMode === 'mobile' ? mobileNumber : email;
     if (!identifier || !password) {
       toastError('Please fill in all required fields.');
@@ -227,73 +287,175 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Input Switch */}
-              {loginMode === 'mobile' ? (
-                /* Mobile Number input with simulated country selector */
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile number</label>
-                  <div className="flex gap-2">
-                    {/* Simulated Country Dropdown */}
-                    <div className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-muted/20 text-foreground cursor-pointer select-none text-sm font-semibold">
-                      <span>🇮🇳</span>
-                      <svg className="h-3 w-3 text-muted-foreground fill-current" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+              {authMethod === 'otp' ? (
+                <>
+                  {/* Mobile Number input (disabled if OTP is requested) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile number</label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-muted/20 text-foreground cursor-default select-none text-sm font-semibold">
+                        <span>🇮🇳</span>
+                      </div>
+                      <div className="relative flex-1">
+                        <span className="absolute left-3.5 top-3 text-sm font-bold text-foreground">+91</span>
+                        <Input
+                          type="tel"
+                          maxLength={10}
+                          placeholder="Enter 10-digit number"
+                          className="pl-12 pr-10 text-sm font-semibold rounded-xl border border-border"
+                          value={mobileNumber}
+                          onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                          disabled={otpRequested}
+                          required
+                        />
+                        <Phone className="absolute right-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    {/* Input field with +91 prefix */}
-                    <div className="relative flex-1">
-                      <span className="absolute left-3.5 top-3 text-sm font-bold text-foreground">+91</span>
+                  </div>
+
+                  {otpRequested && (
+                    <>
+                      {/* OTP Code input */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Verification Code</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAuthMethod('password');
+                              setOtpRequested(false);
+                              setOtpCode('');
+                              setErrorMsg(null);
+                            }}
+                            className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline"
+                          >
+                            Login via Password
+                          </button>
+                        </div>
+                        <Input
+                          type="text"
+                          maxLength={4}
+                          placeholder="Enter 4-digit OTP"
+                          className="text-center text-lg font-mono font-bold tracking-widest rounded-xl border border-border"
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                          required
+                        />
+                      </div>
+
+                      {/* Email Simulator Panel for OTP */}
+                      {simulatedLoginOtp && (
+                        <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-4 border border-blue-500/20">
+                          <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-blue-500">Email Simulator Panel</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Use this code (sent to registered email) to verify: <span className="font-mono font-bold text-blue-500 text-sm select-all">{simulatedLoginOtp}</span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpRequested(false);
+                          setOtpCode('');
+                          setSimulatedLoginOtp(null);
+                        }}
+                        className="text-xs text-muted-foreground hover:text-foreground underline w-full text-center mt-2"
+                      >
+                        Change Mobile Number / Resend OTP
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Input Switch */}
+                  {loginMode === 'mobile' ? (
+                    /* Mobile Number input with simulated country selector */
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile number</label>
+                      <div className="flex gap-2">
+                        {/* Simulated Country Dropdown */}
+                        <div className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-muted/20 text-foreground cursor-pointer select-none text-sm font-semibold">
+                          <span>🇮🇳</span>
+                          <svg className="h-3 w-3 text-muted-foreground fill-current" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+                        </div>
+                        {/* Input field with +91 prefix */}
+                        <div className="relative flex-1">
+                          <span className="absolute left-3.5 top-3 text-sm font-bold text-foreground">+91</span>
+                          <Input
+                            type="tel"
+                            maxLength={10}
+                            placeholder="Enter 10-digit number"
+                            className="pl-12 pr-10 text-sm font-semibold rounded-xl border border-border"
+                            value={mobileNumber}
+                            onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                            required
+                          />
+                          <Phone className="absolute right-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Email Address input */
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email address</label>
+                      <div className="relative">
+                        <Input
+                          type="email"
+                          placeholder="name@example.com"
+                          className="pl-10 pr-4 text-sm font-semibold rounded-xl border border-border"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                        />
+                        <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Password input */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMethod('otp');
+                          setLoginMode('mobile');
+                          setOtpRequested(false);
+                          setOtpCode('');
+                          setErrorMsg(null);
+                        }}
+                        className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline"
+                      >
+                        Login via OTP
+                      </button>
+                    </div>
+                    <div className="relative">
                       <Input
-                        type="tel"
-                        maxLength={10}
-                        placeholder="Enter 10-digit number"
-                        className="pl-12 pr-10 text-sm font-semibold rounded-xl border border-border"
-                        value={mobileNumber}
-                        onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter password"
+                        className="pl-10 pr-10 text-sm font-semibold rounded-xl border border-border"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
                         required
                       />
-                      <Phone className="absolute right-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground focus:outline-none"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
-                </div>
-              ) : (
-                /* Email Address input */
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email address</label>
-                  <div className="relative">
-                    <Input
-                      type="email"
-                      placeholder="name@example.com"
-                      className="pl-10 pr-4 text-sm font-semibold rounded-xl border border-border"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                    <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
-                  </div>
-                </div>
+                </>
               )}
-
-              {/* Password input */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter password"
-                    className="pl-10 pr-10 text-sm font-semibold rounded-xl border border-border"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                  <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-3.5 text-muted-foreground hover:text-foreground focus:outline-none"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
 
               {/* Submit Button */}
               <Button 
@@ -303,9 +465,11 @@ export default function LoginPage() {
               >
                 {loading ? (
                   <span className="flex items-center gap-1.5 justify-center">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Continuing...
+                    <Loader2 className="h-4 w-4 animate-spin" /> {authMethod === 'otp' ? (otpRequested ? 'Verifying...' : 'Sending...') : 'Continuing...'}
                   </span>
-                ) : 'Continue'}
+                ) : (
+                  authMethod === 'otp' ? (otpRequested ? 'Verify & Login' : 'Send OTP') : 'Continue'
+                )}
               </Button>
             </form>
 

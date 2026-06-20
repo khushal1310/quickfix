@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { User, Shield, Phone, Lock, Sparkles, CheckCircle, Info, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { User, Shield, Phone, Lock, Sparkles, CheckCircle, Info, Loader2, ArrowRight, ArrowLeft, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
@@ -73,6 +73,7 @@ export default function RegisterPage() {
     defaultValues: {
       fullName: '',
       mobileNumber: '',
+      email: '',
       password: '',
       confirmPassword: '',
       role: 'customer' as 'customer' | 'provider',
@@ -95,7 +96,8 @@ export default function RegisterPage() {
         data.mobileNumber,
         data.password,
         data.role,
-        data.role === 'provider' ? data.serviceCategory : undefined
+        data.role === 'provider' ? data.serviceCategory : undefined,
+        data.email
       );
 
       if (res.success) {
@@ -155,12 +157,12 @@ export default function RegisterPage() {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-2xl font-black tracking-tight text-foreground">
-              {step === 1 ? 'Create Account' : 'Verify Mobile'}
+              {step === 1 ? 'Create Account' : 'Verify Email'}
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
               {step === 1 
                 ? 'Join QuickFix as a customer or local service provider.' 
-                : `Enter the 4-digit verification code sent to ${mobileNum}.`}
+                : `Enter the 4-digit verification code sent to your email.`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -194,6 +196,21 @@ export default function RegisterPage() {
                       className="pl-10"
                       required
                       {...register('mobileNumber')}
+                    />
+                  </div>
+                </div>
+
+                {/* Email Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      placeholder="Enter email address"
+                      className="pl-10"
+                      required
+                      {...register('email')}
                     />
                   </div>
                 </div>
