@@ -11,6 +11,7 @@ interface AuthState {
   
   loadSession: () => Promise<void>;
   login: (mobileNumber: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (email: string, name: string, avatar?: string) => Promise<{ success: boolean; error?: string }>;
   register: (fullName: string, mobileNumber: string, password: string, role: 'customer' | 'provider', serviceCategory?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
   verifyOtp: (mobileNumber: string, otpCode: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
@@ -63,6 +64,41 @@ export const useAuth = create<AuthState>((set, get) => ({
       
       if (!res.ok) {
         throw new Error(data.error || 'Login failed.');
+      }
+
+      localStorage.setItem('qf_token', data.token);
+      document.cookie = `qf_token=${data.token}; path=/; max-age=2592000; SameSite=Strict`;
+      localStorage.setItem('qf_user', JSON.stringify(data.user));
+      await setSupabaseToken(data.token);
+
+      set({
+        token: data.token,
+        user: data.user,
+        isAuthenticated: true,
+        error: null,
+      });
+      
+      return { success: true };
+    } catch (err: any) {
+      set({ error: err.message });
+      return { success: false, error: err.message };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  loginWithGoogle: async (email, name, avatar) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch('/api/auth/google-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, avatar }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Google Login failed.');
       }
 
       localStorage.setItem('qf_token', data.token);

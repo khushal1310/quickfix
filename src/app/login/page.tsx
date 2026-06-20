@@ -20,7 +20,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, user, isAuthenticated } = useAuth();
+  const { login, loginWithGoogle, user, isAuthenticated } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
@@ -28,12 +28,98 @@ export default function LoginPage() {
       router.replace(`/${user.role}`);
     }
   }, [isAuthenticated, user, router]);
+
+  // Load Google Identity Services SDK script
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const handleGoogleCredentialResponse = async (response: any) => {
+      try {
+        setLoading(true);
+        setErrorMsg(null);
+        const token = response.credential;
+        
+        // Decode the JWT token payload
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        
+        const payload = JSON.parse(jsonPayload);
+        const { email, name, picture } = payload;
+        
+        const res = await loginWithGoogle(email, name, picture);
+        if (res.success) {
+          toastSuccess('Logged in with Google successfully!');
+          const userJson = localStorage.getItem('qf_user');
+          if (userJson) {
+            const userObj = JSON.parse(userJson);
+            router.push(`/${userObj.role}`);
+          } else {
+            router.push('/');
+          }
+        } else {
+          setErrorMsg(res.error || 'Google login failed.');
+          toastError(res.error || 'Google login failed.');
+        }
+      } catch (err: any) {
+        setErrorMsg(err.message || 'An error occurred during Google sign-in.');
+        toastError(err.message || 'An error occurred during Google sign-in.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      (window as any).google?.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCredentialResponse,
+      });
+      // Optionally trigger One Tap prompt
+      (window as any).google?.accounts.id.prompt();
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      try {
+        document.body.removeChild(script);
+      } catch (e) {
+        // script might have been removed already
+      }
+    };
+  }, [loginWithGoogle, router, toastSuccess, toastError]);
+
+  // Render Google Sign-in button when Modal is open
+  const [oauthModal, setOauthModal] = useState<'google' | 'apple' | null>(null);
   
+  useEffect(() => {
+    if (oauthModal === 'google' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+      const interval = setInterval(() => {
+        const container = document.getElementById('google-signin-btn-container');
+        if (container && (window as any).google) {
+          (window as any).google.accounts.id.renderButton(container, {
+            theme: 'outline',
+            size: 'large',
+            width: 320,
+          });
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [oauthModal]);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
-  // Login flow states
-  const [oauthModal, setOauthModal] = useState<'google' | 'apple' | null>(null);
   const [loginMode, setLoginMode] = useState<'mobile' | 'email'>('mobile');
   const [mobileNumber, setMobileNumber] = useState('');
   const [email, setEmail] = useState('');
@@ -328,51 +414,62 @@ export default function LoginPage() {
               Sign in with {oauthModal === 'google' ? 'Google' : 'Apple'}
             </DialogTitle>
             <DialogDescription className="text-center text-xs text-muted-foreground mt-1">
-              Select one of the pre-linked accounts to continue.
+              {oauthModal === 'google' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? 'Click the button below to sign in using your Google account.' : 'Select one of the pre-linked accounts to continue.'}
             </DialogDescription>
             
             {/* Real OAuth Setup Info Alert */}
-            <div className="mt-3 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 leading-normal space-y-1 text-left">
-              <span className="font-bold block">🛠️ Real Login Setup Required:</span>
-              <p>
-                To fetch real accounts from your device, this app must be registered in the Google Cloud Console &amp; Apple Developer Portal to get a secure Client ID linked to your domain.
-              </p>
-              <p className="font-semibold text-[10px]">
-                Please refer to the <span className="underline">official_app_roadmap.md</span> file in your workspace for setup instructions.
-              </p>
-            </div>
+            {!(oauthModal === 'google' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) && (
+              <div className="mt-3 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 leading-normal space-y-1 text-left">
+                <span className="font-bold block">🛠️ Real Login Setup Required:</span>
+                <p>
+                  To fetch real accounts from your device, this app must be registered in the Google Cloud Console &amp; Apple Developer Portal to get a secure Client ID linked to your domain.
+                </p>
+                <p className="font-semibold text-[10px]">
+                  Please refer to the <span className="underline font-bold text-amber-900 dark:text-amber-200">official_app_roadmap.md</span> file in your workspace for setup instructions.
+                </p>
+              </div>
+            )}
           </DialogHeader>
 
-          <div className="space-y-3 my-2 max-h-72 overflow-y-auto pr-1">
-            {[
-              { name: 'Alice Customer', desc: 'Customer Account', email: 'customer@quickfix.com', mobile: '1111111111', avatar: 'Alice' },
-              { name: 'Bob Provider', desc: 'Bronze Cleaning Provider', email: 'provider@quickfix.com', mobile: '2222222222', avatar: 'Bob' },
-              { name: 'Charlie Silver', desc: 'Charlie Silver (Silver)', email: 'charlie@quickfix.com', mobile: '3333333333', avatar: 'Charlie' },
-              { name: 'Daniel Gold', desc: 'Daniel Gold (Gold)', email: 'daniel@quickfix.com', mobile: '4444444444', avatar: 'Daniel' },
-              { name: 'Edward Platinum', desc: 'Edward Platinum (Platinum)', email: 'edward@quickfix.com', mobile: '5555555555', avatar: 'Edward' },
-              { name: 'Admin Moderation', desc: 'Administrator Account', email: 'admin@quickfix.com', mobile: '9999999999', avatar: 'Admin' }
-            ].map((acc) => (
-              <button
-                key={acc.mobile}
-                type="button"
-                onClick={() => selectOAuthAccount(acc.mobile)}
-                className="w-full flex items-center justify-between p-3 border border-border bg-muted/20 hover:bg-muted/80 rounded-xl text-left transition-all duration-150"
-              >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${acc.avatar}`}
-                    alt={acc.name}
-                    className="h-9 w-9 rounded-full bg-background border border-border object-cover"
-                  />
-                  <div>
-                    <h4 className="text-sm font-bold text-foreground">{acc.name}</h4>
-                    <span className="text-[10px] text-muted-foreground block font-medium">{acc.desc} • {acc.email}</span>
+          {oauthModal === 'google' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ? (
+            <div className="flex flex-col items-center justify-center py-6 space-y-4">
+              <div id="google-signin-btn-container" className="w-full flex justify-center min-h-[44px]"></div>
+              <p className="text-[10px] text-muted-foreground text-center px-4 leading-relaxed">
+                This will authenticate you securely via Google. If you don&apos;t have a QuickFix account yet, one will be automatically registered for you as a customer.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 my-2 max-h-72 overflow-y-auto pr-1">
+              {[
+                { name: 'Alice Customer', desc: 'Customer Account', email: 'customer@quickfix.com', mobile: '1111111111', avatar: 'Alice' },
+                { name: 'Bob Provider', desc: 'Bronze Cleaning Provider', email: 'provider@quickfix.com', mobile: '2222222222', avatar: 'Bob' },
+                { name: 'Charlie Silver', desc: 'Charlie Silver (Silver)', email: 'charlie@quickfix.com', mobile: '3333333333', avatar: 'Charlie' },
+                { name: 'Daniel Gold', desc: 'Daniel Gold (Gold)', email: 'daniel@quickfix.com', mobile: '4444444444', avatar: 'Daniel' },
+                { name: 'Edward Platinum', desc: 'Edward Platinum (Platinum)', email: 'edward@quickfix.com', mobile: '5555555555', avatar: 'Edward' },
+                { name: 'Admin Moderation', desc: 'Administrator Account', email: 'admin@quickfix.com', mobile: '9999999999', avatar: 'Admin' }
+              ].map((acc) => (
+                <button
+                  key={acc.mobile}
+                  type="button"
+                  onClick={() => selectOAuthAccount(acc.mobile)}
+                  className="w-full flex items-center justify-between p-3 border border-border bg-muted/20 hover:bg-muted/80 rounded-xl text-left transition-all duration-150"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={`https://api.dicebear.com/7.x/adventurer/svg?seed=${acc.avatar}`}
+                      alt={acc.name}
+                      className="h-9 w-9 rounded-full bg-background border border-border object-cover"
+                    />
+                    <div>
+                      <h4 className="text-sm font-bold text-foreground">{acc.name}</h4>
+                      <span className="text-[10px] text-muted-foreground block font-medium">{acc.desc} • {acc.email}</span>
+                    </div>
                   </div>
-                </div>
-                <span className="text-[10px] font-black text-primary hover:underline uppercase tracking-wider">Select</span>
-              </button>
-            ))}
-          </div>
+                  <span className="text-[10px] font-black text-primary hover:underline uppercase tracking-wider">Select</span>
+                </button>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
