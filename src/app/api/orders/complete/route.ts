@@ -105,15 +105,25 @@ export async function POST(req: NextRequest) {
 
       // 1. Update order status to AUTOCOMPLETED (since customer has confirmed it)
       const completedTime = order.completed_at || new Date().toISOString();
-      await supabaseAdmin
+      const { error: orderUpdateErr } = await supabaseAdmin
         .from('orders')
         .update({ status: 'AUTOCOMPLETED', completed_at: completedTime })
         .eq('id', orderId);
 
-      await supabaseAdmin
+      if (orderUpdateErr) {
+        console.error('Error updating order to AUTOCOMPLETED:', orderUpdateErr);
+        return NextResponse.json({ error: `Failed to update order status: ${orderUpdateErr.message}` }, { status: 500 });
+      }
+
+      const { error: reqUpdateErr } = await supabaseAdmin
         .from('service_requests')
         .update({ status: 'AUTOCOMPLETED' })
         .eq('id', order.request_id);
+
+      if (reqUpdateErr) {
+        console.error('Error updating service request to AUTOCOMPLETED:', reqUpdateErr);
+        return NextResponse.json({ error: `Failed to update service request status: ${reqUpdateErr.message}` }, { status: 500 });
+      }
 
       // 2. Insert provider review if rating is provided
       if (rating) {
