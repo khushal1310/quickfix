@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
+import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 
 // Haversine formula to calculate distance in km
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -134,6 +135,7 @@ export default function ProviderDashboard() {
   // UI States
   const [activeTab, setActiveTab] = useState<'nearby' | 'assigned'>('nearby');
   const [loading, setLoading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Data States
   const [wallet, setWallet] = useState<any | null>(null);
@@ -752,7 +754,8 @@ export default function ProviderDashboard() {
                                 key={i}
                                 src={img.image_url}
                                 alt="reference"
-                                className="h-12 w-12 rounded-lg object-cover border border-border"
+                                className="h-12 w-12 rounded-lg object-cover border border-border cursor-zoom-in shrink-0 hover:scale-105 transition-transform"
+                                onClick={() => setPreviewImage(img.image_url)}
                               />
                             ))}
                           </div>
@@ -963,8 +966,8 @@ export default function ProviderDashboard() {
                                               key={i} 
                                               src={img.image_url} 
                                               alt="reference photo" 
-                                              className="h-14 w-14 rounded-lg object-cover border border-border cursor-zoom-in shrink-0"
-                                              onClick={() => window.open(img.image_url, '_blank')}
+                                              className="h-14 w-14 rounded-lg object-cover border border-border cursor-zoom-in shrink-0 hover:scale-105 transition-transform"
+                                              onClick={() => setPreviewImage(img.image_url)}
                                             />
                                           ))}
                                         </div>
@@ -1222,8 +1225,8 @@ export default function ProviderDashboard() {
                         key={i}
                         src={img.image_url}
                         alt="Customer Reference"
-                        className="h-28 w-full rounded-xl object-cover border border-border shrink-0 cursor-zoom-in"
-                        onClick={() => window.open(img.image_url, '_blank')}
+                        className="h-28 w-28 rounded-xl object-cover border border-border shrink-0 cursor-zoom-in hover:scale-105 transition-transform"
+                        onClick={() => setPreviewImage(img.image_url)}
                       />
                     ))}
                   </div>
@@ -1281,6 +1284,31 @@ export default function ProviderDashboard() {
           </div>
         );
       })()}
+
+      {/* Premium Image Preview Lightbox Overlay */}
+      {previewImage && (
+        <Dialog open={previewImage !== null} onOpenChange={(open) => !open && setPreviewImage(null)}>
+          <DialogContent className="max-w-3xl border-none bg-black/95 p-1 rounded-2xl shadow-2xl overflow-hidden flex flex-col items-center justify-center z-[99999]">
+            <div className="relative w-full max-h-[85vh] flex items-center justify-center p-2">
+              <img 
+                src={previewImage} 
+                alt="Enlarged reference preview" 
+                className="max-w-full max-h-[75vh] object-contain rounded-lg border border-white/10"
+              />
+            </div>
+            <DialogFooter className="w-full justify-center pb-4 pt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 font-bold hover:text-white"
+                onClick={() => setPreviewImage(null)}
+              >
+                Close Preview
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
