@@ -103,16 +103,16 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Order must be in COMPLETED or IN_PROGRESS state to confirm.' }, { status: 400 });
       }
 
-      // 1. Update order status to COMPLETED (already is, or move to COMPLETED if not provider-marked yet)
+      // 1. Update order status to AUTOCOMPLETED (since customer has confirmed it)
       const completedTime = order.completed_at || new Date().toISOString();
       await supabaseAdmin
         .from('orders')
-        .update({ status: 'COMPLETED', completed_at: completedTime })
+        .update({ status: 'AUTOCOMPLETED', completed_at: completedTime })
         .eq('id', orderId);
 
       await supabaseAdmin
         .from('service_requests')
-        .update({ status: 'COMPLETED' })
+        .update({ status: 'AUTOCOMPLETED' })
         .eq('id', order.request_id);
 
       // 2. Insert provider review if rating is provided
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({ success: true, status: 'COMPLETED' });
+      return NextResponse.json({ success: true, status: 'AUTOCOMPLETED' });
     }
 
     return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });

@@ -13,7 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { 
   Briefcase, Wallet, Clock, CheckCircle, ArrowRight, Loader2, 
   MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft, ArrowLeft,
-  History, ChevronDown, ChevronUp
+  History, ChevronDown, ChevronUp, Wrench
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';

@@ -151,9 +151,24 @@ export function LeafletMap({ providerLat, providerLng, customerLat, customerLng,
     }
 
     // Fix leaflet map sizing bug when loaded dynamically
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (map) map.invalidateSize();
     }, 250);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove();
+        } catch (e) {
+          console.warn('Leaflet cleanup warning:', e);
+        }
+        mapRef.current = null;
+        markerProviderRef.current = null;
+        markerCustomerRef.current = null;
+        polylineRef.current = null;
+      }
+    };
 
   }, [mapLoaded, providerLat, providerLng, customerLat, customerLng, mapContainerId]);
 

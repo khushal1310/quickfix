@@ -491,12 +491,12 @@ export default function CustomerDashboard() {
       setActiveOrders(ords);
     }
 
-    // 3. Fetch Completed Orders (COMPLETED, AUTOCOMPLETED, CANCELLED)
+    // 3. Fetch Completed Orders (AUTOCOMPLETED, CANCELLED)
     const { data: compOrds } = await supabase
       .from('orders')
       .select('*, request:service_requests(*), provider:users(*)')
       .eq('customer_id', user.id)
-      .in('status', ['COMPLETED', 'AUTOCOMPLETED', 'CANCELLED'])
+      .in('status', ['AUTOCOMPLETED', 'CANCELLED'])
       .order('completed_at', { ascending: false });
 
     if (compOrds) {
