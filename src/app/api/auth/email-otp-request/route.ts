@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendEmail, getOtpEmailTemplate } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +30,19 @@ export async function POST(req: NextRequest) {
     // 2. Generate 4-digit OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
     console.log(`[QuickFix Email Simulator] Signup OTP for ${emailStr}: ${otpCode}`);
+
+    // Send the email via Brevo
+    const emailHtml = getOtpEmailTemplate(otpCode, 'યુઝર', 'registration');
+    const emailResult = await sendEmail({
+      to: emailStr,
+      subject: 'QuickFix ઇમેલ વેરિફિકેશન કોડ',
+      htmlContent: emailHtml,
+      textContent: `નમસ્તે, QuickFix સાઇન-અપ માટે તમારો વેરિફિકેશન કોડ છે: ${otpCode}`,
+    });
+
+    if (!emailResult.success) {
+      console.error('Failed to send verification email via Brevo:', emailResult.error);
+    }
 
     // 3. Store OTP in user_otps table
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry

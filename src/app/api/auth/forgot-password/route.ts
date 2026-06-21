@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendEmail, getOtpEmailTemplate } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
     const isEmail = mobileNumber.includes('@');
     const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
     
-    let query = supabaseAdmin.from('users').select('id, email, mobile_number');
+    let query = supabaseAdmin.from('users').select('id, email, mobile_number, full_name');
     if (isEmail) {
       query = query.eq('email', inputIdentifier);
     } else {
@@ -38,6 +39,19 @@ export async function POST(req: NextRequest) {
     // 2. Generate 4-digit OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
     console.log(`[QuickFix Email Simulator] Password Reset OTP for ${email}: ${otpCode}`);
+
+    // Send the email via Brevo
+    const emailHtml = getOtpEmailTemplate(otpCode, user.full_name || 'યુઝર', 'reset');
+    const emailResult = await sendEmail({
+      to: email,
+      subject: 'QuickFix પાસવર્ડ રીસેટ કોડ',
+      htmlContent: emailHtml,
+      textContent: `નમસ્તે, તમારા પાસવર્ડને રીસેટ કરવા માટેનો વેરિફિકેશન કોડ છે: ${otpCode}`,
+    });
+
+    if (!emailResult.success) {
+      console.error('Failed to send reset email via Brevo:', emailResult.error);
+    }
 
     // 3. Store in user_otps table
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry
