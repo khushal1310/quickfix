@@ -452,57 +452,56 @@ export default function CustomerDashboard() {
   const fetchCustomerData = async () => {
     if (!user) return;
     
-    // Fetch latest user profile to get saved addresses
-    const { data: profile } = await supabase
-      .from('users')
-      .select('addresses')
-      .eq('id', user.id)
-      .maybeSingle();
+    try {
+      const [profileRes, reqsRes, ordsRes, compOrdsRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('addresses')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('service_requests')
+          .select('*, category:service_categories(*), request_images(*), provider_accepts(count)')
+          .eq('customer_id', user.id)
+          .in('status', ['OPEN', 'ACCEPTED', 'SELECTED'])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('*, request:service_requests(*), provider:users(*)')
+          .eq('customer_id', user.id)
+          .in('status', ['SELECTED', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'])
+          .order('started_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('*, request:service_requests(*), provider:users(*)')
+          .eq('customer_id', user.id)
+          .in('status', ['AUTOCOMPLETED', 'CANCELLED'])
+          .order('completed_at', { ascending: false })
+      ]);
 
-    if (profile && profile.addresses) {
-      setSavedAddresses(profile.addresses);
-    }
-    
-    // 1. Fetch Service Requests (OPEN / ACCEPTED / SELECTED)
-    const { data: reqs } = await supabase
-      .from('service_requests')
-      .select('*, category:service_categories(*), request_images(*), provider_accepts(count)')
-      .eq('customer_id', user.id)
-      .in('status', ['OPEN', 'ACCEPTED', 'SELECTED'])
-      .order('created_at', { ascending: false });
+      if (profileRes.data && profileRes.data.addresses) {
+        setSavedAddresses(profileRes.data.addresses);
+      }
 
-    if (reqs) {
-      // Formulate custom acceptsCount join count
-      const formattedReqs = reqs.map(r => ({
-        ...r,
-        acceptsCount: r.provider_accepts?.[0]?.count || 0
-      }));
-      setActiveRequests(formattedReqs);
-    }
+      const reqs = reqsRes.data;
+      if (reqs) {
+        // Formulate custom acceptsCount join count
+        const formattedReqs = reqs.map(r => ({
+          ...r,
+          acceptsCount: r.provider_accepts?.[0]?.count || 0
+        }));
+        setActiveRequests(formattedReqs);
+      }
 
-    // 2. Fetch Active Orders
-    const { data: ords } = await supabase
-      .from('orders')
-      .select('*, request:service_requests(*), provider:users(*)')
-      .eq('customer_id', user.id)
-      .in('status', ['SELECTED', 'IN_PROGRESS', 'COMPLETED', 'DISPUTED'])
-      .order('started_at', { ascending: false });
+      if (ordsRes.data) {
+        setActiveOrders(ordsRes.data);
+      }
 
-    if (ords) {
-      setActiveOrders(ords);
-    }
-
-    // 3. Fetch Completed Orders (AUTOCOMPLETED, CANCELLED)
-    const { data: compOrds } = await supabase
-      .from('orders')
-      .select('*, request:service_requests(*), provider:users(*)')
-      .eq('customer_id', user.id)
-      .in('status', ['AUTOCOMPLETED', 'CANCELLED'])
-      .order('completed_at', { ascending: false });
-
-    if (compOrds) {
-      // We filter down completed orders that are finished
-      setCompletedOrders(compOrds);
+      if (compOrdsRes.data) {
+        setCompletedOrders(compOrdsRes.data);
+      }
+    } catch (err) {
+      console.error('Error fetching customer dashboard data:', err);
     }
   };
 

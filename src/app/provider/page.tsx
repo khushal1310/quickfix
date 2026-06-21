@@ -255,124 +255,128 @@ export default function ProviderDashboard() {
   const fetchProviderData = async () => {
     if (!user) return;
 
-    // 0. Fetch user category object
-    // Since users table doesn't link directly, we find the category matching the provider metadata category name
-    const { data: userProfile } = await supabase.from('users').select('*').eq('id', user.id).single();
-    let categoryObj = null;
-    if (userProfile) {
-      setDbUser(userProfile);
-      // Find category
-      const { data: cat } = await supabase
-        .from('service_categories')
-        .select('*')
-        .eq('name', 'Cleaning') // Fallback just in case, but let's see
-        .maybeSingle();
-      
-      // Let's list all categories to match profile service category string
-      const { data: cats } = await supabase.from('service_categories').select('*');
-      if (cats) {
-        // Find category matching the user category
-        const matched = cats.find(c => c.name.toLowerCase() === 'cleaning'); // standard fallback
-        // Since we seed categories, let's try to match user profile category
-        // In verify-otp we insert role category, let's fetch matching one
-        // For simplicity:
-        categoryObj = matched;
+    try {
+      const [
+        userProfileRes,
+        categoriesRes,
+        walletRes,
+        acceptsRes,
+        reqsRes,
+        ordersRes
+      ] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('service_categories')
+          .select('*'),
+        supabase
+          .from('wallets')
+          .select('*')
+          .eq('provider_id', user.id)
+          .maybeSingle(),
+        supabase
+          .from('provider_accepts')
+          .select('request_id, status')
+          .eq('provider_id', user.id),
+        supabase
+          .from('service_requests')
+          .select('*, customer:users(*), category:service_categories(*), request_images(*)')
+          .in('status', ['OPEN', 'ACCEPTED']),
+        supabase
+          .from('orders')
+          .select('*, request:service_requests(*), customer:users(*)')
+          .eq('provider_id', user.id)
+          .order('started_at', { ascending: false })
+      ]);
+
+      const userProfile = userProfileRes.data;
+      if (userProfile) {
+        setDbUser(userProfile);
       }
-    }
 
-    // 1. Fetch Wallet details
-    const { data: wlt } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('provider_id', user.id)
-      .maybeSingle();
+      // Populate category logic if needed (matching categories to user service category)
+      const cats = categoriesRes.data;
+      let categoryObj = null;
+      if (cats && userProfile) {
+        const matched = cats.find(c => c.name.toLowerCase() === (userProfile.service_category || 'cleaning').toLowerCase());
+        categoryObj = matched || cats.find(c => c.name.toLowerCase() === 'cleaning');
+      }
 
-    if (wlt) {
-      setWallet(wlt);
+      const wlt = walletRes.data;
+      if (wlt) {
+        setWallet(wlt);
 
-      // Fetch Wallet Transactions
-      const { data: txns } = await supabase
-        .from('wallet_transactions')
-        .select('*')
-        .eq('wallet_id', wlt.id)
-        .order('created_at', { ascending: false });
-      setTransactions(txns || []);
-    }
+        // Fetch Wallet Transactions
+        const { data: txns } = await supabase
+          .from('wallet_transactions')
+          .select('*')
+          .eq('wallet_id', wlt.id)
+          .order('created_at', { ascending: false });
+        setTransactions(txns || []);
+      }
 
-    // 2. Fetch Accepts to track what we've already accepted/rejected
-    const { data: accepts } = await supabase
-      .from('provider_accepts')
-      .select('request_id, status')
-      .eq('provider_id', user.id);
+      const accepts = acceptsRes.data;
+      const acceptedIds = accepts?.filter(a => a.status === 'ACCEPTED').map(a => a.request_id) || [];
+      const rejectedIds = accepts?.filter(a => a.status === 'REJECTED').map(a => a.request_id) || [];
+      setAcceptedRequestsIds(acceptedIds);
 
-    const acceptedIds = accepts?.filter(a => a.status === 'ACCEPTED').map(a => a.request_id) || [];
-    const rejectedIds = accepts?.filter(a => a.status === 'REJECTED').map(a => a.request_id) || [];
-    setAcceptedRequestsIds(acceptedIds);
-
-    // 3. Fetch Nearby Service Requests (OPEN/ACCEPTED, category match, not rejected by us)
-    let reqsQuery = supabase
-      .from('service_requests')
-      .select('*, customer:users(*), category:service_categories(*), request_images(*)')
-      .in('status', ['OPEN', 'ACCEPTED']);
-
-    // If we have rejected list, exclude them
-    const { data: reqs } = await reqsQuery;
-    if (reqs) {
-      // Filter out rejected ones and those outside the radial dispatch limits
-      const filteredReqs = reqs.filter(r => {
-        if (rejectedIds.includes(r.id)) return false;
-        
-        const elapsedSeconds = (Date.now() - new Date(r.created_at || new Date()).getTime()) / 1000;
-        
-        // 1. Hide requests older than 5 minutes (300 seconds)
-        if (elapsedSeconds > 300) return false;
-        
-        // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
-        let limit = 5.0;
-        if (elapsedSeconds <= 10) {
-          limit = 1.0;
-        } else if (elapsedSeconds <= 20) {
-          limit = 5.0;
-        } else {
-          limit = 500.0; // Unlimited for cross-city testing
-        }
-        
-        // If request has coordinates, calculate distance
-        if (r.latitude !== undefined && r.longitude !== undefined && providerLat && providerLng) {
-          const dist = getDistanceKm(providerLat, providerLng, r.latitude, r.longitude);
-          return dist <= limit;
-        }
-        return true; // fallback
-      });
-      
-      // Check for new requests to trigger notification toast and audio alert
-      const currentIds = filteredReqs.map(r => r.id);
-      const prevIds = prevRequestIdsRef.current;
-      const newReqs = filteredReqs.filter(r => !prevIds.includes(r.id));
-      
-      if (newReqs.length > 0 && prevIds.length > 0) {
-        try {
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav');
-          audio.volume = 0.5;
-          audio.play().catch(e => console.log('Audio playback blocked by browser policy.'));
-        } catch (e) {}
-        
-        newReqs.forEach(req => {
-          toastSuccess(`New nearby task: ${req.category?.name || 'Service Requested'} (₹${req.budget || ''})`);
+      const reqs = reqsRes.data;
+      if (reqs) {
+        // Filter out rejected ones and those outside the radial dispatch limits
+        const filteredReqs = reqs.filter(r => {
+          if (rejectedIds.includes(r.id)) return false;
+          
+          const elapsedSeconds = (Date.now() - new Date(r.created_at || new Date()).getTime()) / 1000;
+          
+          // 1. Hide requests older than 5 minutes (300 seconds)
+          if (elapsedSeconds > 300) return false;
+          
+          // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
+          let limit = 5.0;
+          if (elapsedSeconds <= 10) {
+            limit = 1.0;
+          } else if (elapsedSeconds <= 20) {
+            limit = 5.0;
+          } else {
+            limit = 500.0; // Unlimited for cross-city testing
+          }
+          
+          // If request has coordinates, calculate distance
+          if (r.latitude !== undefined && r.longitude !== undefined && providerLat && providerLng) {
+            const dist = getDistanceKm(providerLat, providerLng, r.latitude, r.longitude);
+            return dist <= limit;
+          }
+          return true; // fallback
         });
+        
+        // Check for new requests to trigger notification toast and audio alert
+        const currentIds = filteredReqs.map(r => r.id);
+        const prevIds = prevRequestIdsRef.current;
+        const newReqs = filteredReqs.filter(r => !prevIds.includes(r.id));
+        
+        if (newReqs.length > 0 && prevIds.length > 0) {
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav');
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('Audio playback blocked by browser policy.'));
+          } catch (e) {}
+          
+          newReqs.forEach(req => {
+            toastSuccess(`New nearby task: ${req.category?.name || 'Service Requested'} (₹${req.budget || ''})`);
+          });
+        }
+        
+        prevRequestIdsRef.current = currentIds;
+        setNearbyRequests(filteredReqs);
       }
-      
-      prevRequestIdsRef.current = currentIds;
-      setNearbyRequests(filteredReqs);
-    }
 
-    // 4. Fetch Assigned Service Orders (where this provider is SELECTED)
-    const { data: ords } = await supabase
-      .from('orders')
-      .select('*, request:service_requests(*), customer:users(*)')
-      .eq('provider_id', user.id)
-      .order('started_at', { ascending: false });
-    setAssignedOrders(ords || []);
+      setAssignedOrders(ordersRes.data || []);
+    } catch (err) {
+      console.error('Error fetching provider dashboard data:', err);
+    }
   };
 
   // Provider Accept Request

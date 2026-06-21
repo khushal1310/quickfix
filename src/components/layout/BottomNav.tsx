@@ -41,18 +41,7 @@ export function BottomNav() {
           </Link>
         )}
 
-        {/* Provider Specific Action: Wallet history */}
-        {role === 'provider' && (
-          <Link 
-            href="/provider#wallet" 
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition-colors ${
-              pathname.includes('wallet') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            <Wallet className="h-5 w-5" />
-            <span className="text-[10px] font-medium mt-0.5">Wallet</span>
-          </Link>
-        )}
+
 
         {/* Admin Specific Action: Dispute management */}
         {role === 'admin' && (

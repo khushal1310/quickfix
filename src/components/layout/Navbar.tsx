@@ -79,15 +79,7 @@ export function Navbar() {
                 </Button>
               </Link>
 
-              {/* Provider Wallet display */}
-              {user.role === 'provider' && (
-                <Link href="/provider#wallet">
-                  <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-2 rounded-xl border-border bg-card text-foreground hover:bg-muted">
-                    <Wallet className="h-4 w-4 text-primary" />
-                    Wallet
-                  </Button>
-                </Link>
-              )}
+
 
               {/* Profile Image / Initials */}
               <Link href="/account" className="flex items-center gap-2 hover:opacity-85 cursor-pointer">

@@ -147,15 +147,23 @@ export default function AccountPage() {
     if (!authUser) return;
     setDbLoading(true);
     try {
-      // 1. Fetch user data from MongoDB
-      const { data: userRecord, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle();
+      // Fetch both user record and wallet record in parallel
+      const [userRes, walletRes] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .maybeSingle(),
+        supabase
+          .from('wallets')
+          .select('*')
+          .eq('provider_id', authUser.id)
+          .maybeSingle()
+      ]);
 
-      if (userError) throw userError;
+      if (userRes.error) throw userRes.error;
 
+      const userRecord = userRes.data;
       if (userRecord) {
         const profileDetails: UserDBDetails = {
           fullName: userRecord.full_name || authUser.fullName,
@@ -186,13 +194,7 @@ export default function AccountPage() {
         return;
       }
 
-      // 2. Fetch Wallet Balance
-      const { data: walletRecord } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('provider_id', authUser.id)
-        .maybeSingle();
-
+      const walletRecord = walletRes.data;
       if (walletRecord) {
         setWalletBalance(parseFloat(walletRecord.balance) || 0);
         setWalletHeld(parseFloat(walletRecord.held_amount) || 0);
@@ -904,10 +906,7 @@ export default function AccountPage() {
                 <span className="text-sm font-bold text-foreground">Completed Jobs</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button onClick={() => openDrawerModal('provider-earnings')} className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-all text-left">
-                <span className="text-sm font-bold text-foreground">Earnings Report</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </button>
+
             </div>
           </div>
         )}
