@@ -485,44 +485,7 @@ export default function ProviderDashboard() {
     }
   };
 
-  // Debug/Test mock movement towards customer location
-  const handleMockMove = async (order: any, fraction: number) => {
-    const custLat = order.request?.latitude || 23.0225;
-    const custLng = order.request?.longitude || 72.5714;
 
-    const currentLat = providerLat;
-    const currentLng = providerLng;
-
-    let newLat, newLng;
-    if (fraction >= 1.0) {
-      newLat = custLat;
-      newLng = custLng;
-    } else {
-      // Linear step towards customer coordinates
-      newLat = currentLat + (custLat - currentLat) * fraction;
-      newLng = currentLng + (custLng - currentLng) * fraction;
-    }
-
-    setProviderLat(newLat);
-    setProviderLng(newLng);
-
-    if (user) {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          latitude: newLat,
-          longitude: newLng
-        })
-        .eq('id', user.id);
-      
-      if (error) {
-        toastError('Failed to update mock location in DB.');
-      } else {
-        toastSuccess(`Location updated! Moved closer to customer.`);
-        fetchProviderData();
-      }
-    }
-  };
 
   // Mark Completed Action
   const handleMarkCompleted = async (orderId: string) => {
@@ -895,42 +858,7 @@ export default function ProviderDashboard() {
                               </div>
                             </div>
 
-                            {/* Debug / Simulator Control Panel (only visible for active testing) */}
-                            <div className="bg-amber-500/10 border border-amber-500/25 rounded-2xl p-4 text-xs space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-amber-800 dark:text-amber-300">🛠️ Location Simulator (Test Mode):</span>
-                                <span className="text-[10px] text-amber-700 bg-amber-500/10 px-2 py-0.5 rounded-full font-black">ACTIVE</span>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground leading-normal">
-                                Since you are testing, you can mock moving closer to the customer. Clicking these buttons will update your location in the database in real-time.
-                              </p>
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                <Button 
-                                  size="xs" 
-                                  variant="outline" 
-                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
-                                  onClick={() => handleMockMove(order, 0.25)}
-                                >
-                                  Move 250m Closer 🛵
-                                </Button>
-                                <Button 
-                                  size="xs" 
-                                  variant="outline" 
-                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
-                                  onClick={() => handleMockMove(order, 0.50)}
-                                >
-                                  Move 500m Closer 🛵
-                                </Button>
-                                <Button 
-                                  size="xs" 
-                                  variant="outline" 
-                                  className="text-[10px] h-8 border-amber-500/30 text-amber-800 hover:bg-amber-500/20 rounded-lg font-bold"
-                                  onClick={() => handleMockMove(order, 1.0)}
-                                >
-                                  Arrived (At Customer) 🏠
-                                </Button>
-                              </div>
-                            </div>
+
 
                             {/* QuickFix style customer & item details sheet */}
                             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm text-left">
