@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { signJWT } from '@/lib/jwt';
 
 export async function POST(req: NextRequest) {
   try {
@@ -56,47 +57,65 @@ export async function POST(req: NextRequest) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // 4. Generate 4-digit OTP
-    const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log(`[QuickFix Email Simulator] OTP for ${email}: ${otpCode}`);
+    // 4. Create User Directly
+    const defaultAvatar = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(fullName)}`;
 
-    // 5. Store OTP and temp user data in user_otps table
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins expiry
-    
-    const tempUserData = {
-      fullName,
-      mobileNumber,
-      email: email.toLowerCase().trim(),
-      passwordHash,
-      role,
-      serviceCategory: role === 'provider' ? serviceCategory : null,
-    };
+    const { data: newUser, error: insertError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        role,
+        full_name: fullName,
+        mobile_number: mobileNumber,
+        email: email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        profile_image: defaultAvatar,
+        service_category: role === 'provider' ? serviceCategory : null,
+        rating: role === 'provider' ? 5.0 : null,
+        verification_status: role === 'provider' ? 'unverified' : 'verified',
+        kyc_status: role === 'provider' ? 'unverified' : 'verified',
+        completed_orders_count: role === 'provider' ? 0 : 0
+      })
+      .select('*')
+      .single();
 
-    // Upsert OTP (replaces if another exists for this mobile number)
-    const { error: otpError } = await supabaseAdmin
-      .from('user_otps')
-      .upsert(
-        {
-          mobile_number: mobileNumber,
-          otp_code: otpCode,
-          action_type: 'REGISTER',
-          temp_user_data: tempUserData,
-          expires_at: expiresAt,
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: 'mobile_number' }
-      );
-
-    if (otpError) {
-      return NextResponse.json({ error: otpError.message }, { status: 500 });
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
-    // 6. Return response
-    return NextResponse.json({
-      success: true,
-      message: 'OTP generated successfully. Check logs or verify with code.',
-      otp: otpCode, // Exposed for development/testing ease
+    // 5. Sign custom JWT for the Supabase Client
+    const token = await signJWT({
+      id: newUser.id,
+      role: newUser.role,
+      fullName: newUser.full_name,
+      mobileNumber: newUser.mobile_number,
+      custom_user_id: newUser.custom_user_id,
     });
+
+    // 6. Return user details and token
+    const user = {
+      id: newUser.id,
+      role: newUser.role,
+      fullName: newUser.full_name,
+      mobileNumber: newUser.mobile_number,
+      profileImage: newUser.profile_image,
+      createdAt: newUser.created_at,
+      dob: newUser.dob || null,
+      custom_user_id: newUser.custom_user_id,
+    };
+
+    const response = NextResponse.json({
+      success: true,
+      token,
+      user,
+    });
+
+    response.cookies.set('qf_token', token, {
+      path: '/',
+      maxAge: 2592000,
+      sameSite: 'strict',
+    });
+
+    return response;
   } catch (error: any) {
     console.error('Registration API Error:', error);
     return NextResponse.json({ error: error.message || 'Server error during registration.' }, { status: 500 });

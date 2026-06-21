@@ -21,7 +21,7 @@ import {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register: registerUser, verifyOtp, login, user, isAuthenticated } = useAuth();
+  const { register: registerUser, sendEmailOtp, verifyEmailOtp, login, user, isAuthenticated } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
 
   useEffect(() => {
@@ -30,11 +30,14 @@ export default function RegisterPage() {
     }
   }, [isAuthenticated, user, router]);
 
-  const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
-  const [mobileNum, setMobileNum] = useState('');
-  const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
   const [oauthModal, setOauthModal] = useState<'google' | 'apple' | null>(null);
+
+  // Email verification states
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [simulatedEmailOtp, setSimulatedEmailOtp] = useState<string | null>(null);
 
   const selectOAuthAccount = async (mobile: string) => {
     setOauthModal(null);
@@ -59,9 +62,6 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
-  
-  // OTP input state
-  const [otpCode, setOtpCode] = useState('');
 
   // Form handling
   const {
@@ -82,8 +82,58 @@ export default function RegisterPage() {
   });
 
   const selectedRole = watch('role');
+  const emailVal = watch('email');
+
+  const handleSendEmailOtp = async () => {
+    if (!emailVal || !emailVal.includes('@')) {
+      toastError('Please enter a valid email address.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await sendEmailOtp(emailVal);
+      if (res.success) {
+        setSimulatedEmailOtp(res.otp || null);
+        setEmailOtpSent(true);
+        toastSuccess('OTP code sent to your email!');
+      } else {
+        toastError(res.error || 'Failed to send verification OTP.');
+      }
+    } catch (err: any) {
+      toastError(err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (emailOtpCode.length < 4) {
+      toastError('Please enter the 4-digit verification code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await verifyEmailOtp(emailVal, emailOtpCode);
+      if (res.success) {
+        setEmailVerified(true);
+        toastSuccess('Email verified successfully!');
+      } else {
+        toastError(res.error || 'Verification failed.');
+      }
+    } catch (err: any) {
+      toastError(err.message || 'An error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onRegisterSubmit = async (data: any) => {
+    if (!emailVerified) {
+      toastError('Please verify your email address first.');
+      return;
+    }
     if (data.password !== data.confirmPassword) {
       toastError('Passwords do not match.');
       return;
@@ -100,39 +150,14 @@ export default function RegisterPage() {
         data.email
       );
 
-      if (res.success) {
-        setMobileNum(data.mobileNumber);
-        setSimulatedOtp(res.otp || null);
-        toastSuccess('Registration initiated! OTP code sent.');
-        setStep(2); // Go to OTP screen
+      if (res.success && res.user) {
+        toastSuccess('Registration successful! Welcome to QuickFix.');
+        router.push(`/${res.user.role}`);
       } else {
         toastError(res.error || 'Registration failed.');
       }
     } catch (err: any) {
       toastError(err.message || 'An error occurred.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onOtpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otpCode.length < 4) {
-      toastError('Please enter the 4-digit OTP.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await verifyOtp(mobileNum, otpCode);
-      if (res.success && res.user) {
-        toastSuccess('Account verified and logged in successfully!');
-        router.push(`/${res.user.role}`);
-      } else {
-        toastError(res.error || 'Invalid OTP.');
-      }
-    } catch (err: any) {
-      toastError(err.message || 'Verification error.');
     } finally {
       setLoading(false);
     }
@@ -157,238 +182,211 @@ export default function RegisterPage() {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-2xl font-black tracking-tight text-foreground">
-              {step === 1 ? 'Create Account' : 'Verify Email'}
+              Create Account
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
-              {step === 1 
-                ? 'Join QuickFix as a customer or local service provider.' 
-                : `Enter the 4-digit verification code sent to your email.`}
+              Join QuickFix as a customer or local service provider.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {step === 1 ? (
-              // Step 1: Input details
-              <>
-                <form onSubmit={handleSubmit(onRegisterSubmit)} className="space-y-4">
-                {/* Full Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Enter full name"
-                      className="pl-10"
-                      required
-                      {...register('fullName')}
-                    />
-                  </div>
+            <form onSubmit={handleSubmit(onRegisterSubmit)} className="space-y-4">
+              {/* Full Name */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Full Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Enter full name"
+                    className="pl-10"
+                    required
+                    {...register('fullName')}
+                  />
                 </div>
+              </div>
 
-                {/* Mobile Number */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="tel"
-                      placeholder="Enter mobile number"
-                      className="pl-10"
-                      required
-                      {...register('mobileNumber')}
-                    />
-                  </div>
+              {/* Mobile Number */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="tel"
+                    placeholder="Enter mobile number"
+                    className="pl-10"
+                    required
+                    {...register('mobileNumber')}
+                  />
                 </div>
+              </div>
 
-                {/* Email Address */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
-                  <div className="relative">
+              {/* Email Address */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
                     <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="email"
                       placeholder="Enter email address"
                       className="pl-10"
+                      disabled={emailVerified}
                       required
                       {...register('email')}
                     />
                   </div>
-                </div>
-
-                {/* Role selection */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Account Type</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <label className={`flex items-center justify-center gap-2 p-3.5 rounded-xl border border-border cursor-pointer transition-all duration-200 ${selectedRole === 'customer' ? 'bg-primary/5 border-primary text-primary font-bold' : 'bg-background hover:bg-muted text-foreground'}`}>
-                      <input 
-                        type="radio" 
-                        value="customer" 
-                        className="sr-only" 
-                        {...register('role')} 
-                      />
-                      <span>Customer</span>
-                    </label>
-                    <label className={`flex items-center justify-center gap-2 p-3.5 rounded-xl border border-border cursor-pointer transition-all duration-200 ${selectedRole === 'provider' ? 'bg-primary/5 border-primary text-primary font-bold' : 'bg-background hover:bg-muted text-foreground'}`}>
-                      <input 
-                        type="radio" 
-                        value="provider" 
-                        className="sr-only" 
-                        {...register('role')} 
-                      />
-                      <span>Provider</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Service Category (for providers only) */}
-                {selectedRole === 'provider' && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Service Category</label>
-                    <select
-                      className="flex h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                      {...register('serviceCategory')}
+                  {!emailVerified && (
+                    <Button
+                      type="button"
+                      onClick={handleSendEmailOtp}
+                      disabled={loading || !emailVal}
+                      className="rounded-xl px-4 text-xs font-bold bg-primary text-white hover:bg-primary/90 h-11 shrink-0"
                     >
-                      <option value="Cleaning">Cleaning</option>
-                      <option value="Plumbing">Plumbing</option>
-                      <option value="Electrician">Electrician</option>
-                      <option value="Appliance Repair">Appliance Repair</option>
-                      <option value="Painting">Painting</option>
-                      <option value="Pest Control">Pest Control</option>
-                    </select>
+                      {emailOtpSent ? 'Resend' : 'Send OTP'}
+                    </Button>
+                  )}
+                </div>
+                {emailVerified && (
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-500 mt-1">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Email address verified successfully!</span>
                   </div>
                 )}
-
-                {/* Password */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="password"
-                      placeholder="At least 6 characters"
-                      className="pl-10"
-                      required
-                      {...register('password')}
-                    />
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirm Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="password"
-                      placeholder="Repeat password"
-                      className="pl-10"
-                      required
-                      {...register('confirmPassword')}
-                    />
-                  </div>
-                </div>
-
-                {/* Submit button */}
-                <Button type="submit" size="lg" className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold mt-2" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
-              </form>
-              
-              {/* OR Separator */}
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-border/80"></div>
-                <span className="flex-shrink mx-4 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">or</span>
-                <div className="flex-grow border-t border-border/80"></div>
               </div>
 
-              {/* Social Signups */}
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  onClick={() => setOauthModal('apple')}
-                  className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
-                >
-                  <svg className="h-4 w-4 fill-current text-foreground" viewBox="0 0 24 24">
-                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-.96.04-2.13.64-2.82 1.45-.6.69-1.12 1.84-.98 2.94.97.08 2.15-.52 2.81-1.33z"/>
-                  </svg>
-                  Continue with Apple
-                </Button>
-
-                <Button
-                  type="button"
-                  onClick={() => setOauthModal('google')}
-                  className="w-full rounded-xl bg-muted/40 border border-border text-foreground hover:bg-muted font-bold h-11 flex items-center justify-center gap-2.5 transition-all text-sm"
-                >
-                  <svg className="h-4 w-4 fill-current text-red-500" viewBox="0 0 24 24">
-                    <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.478 0-6.3-2.823-6.3-6.3 0-3.478 2.822-6.3 6.3-6.3 1.706 0 3.24.68 4.363 1.774l3.076-3.076C19.488 2.802 16.035 1 11.99 1 5.92 1 11.99s4.92 10.99 10.99 10.99c5.967 0 10.983-4.29 10.983-10.99 0-.727-.08-1.282-.236-1.705H12.24z"/>
-                  </svg>
-                  Continue with Google
-                </Button>
-              </div>
-            </>
-          ) : (
-              // Step 2: OTP screen
-              <form onSubmit={onOtpSubmit} className="space-y-4">
-                {simulatedOtp && (
-                  <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-4 border border-blue-500/20">
-                    <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-bold text-blue-500">SMS Simulator Panel</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use this code to verify: <span className="font-mono font-bold text-blue-500 text-sm select-all">{simulatedOtp}</span>
-                      </p>
+              {/* Email OTP Verification Block */}
+              {!emailVerified && emailOtpSent && (
+                <div className="space-y-2 p-3 bg-muted/30 border border-border/80 rounded-xl">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email Verification Code</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        maxLength={4}
+                        placeholder="Enter 4-digit code"
+                        className="text-center font-mono font-bold tracking-widest h-11"
+                        value={emailOtpCode}
+                        onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, ''))}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleVerifyEmailOtp}
+                        disabled={loading || emailOtpCode.length < 4}
+                        className="rounded-xl px-4 text-xs font-bold bg-primary text-white hover:bg-primary/90 h-11 shrink-0"
+                      >
+                        Verify Code
+                      </Button>
                     </div>
                   </div>
-                )}
 
+                  {/* Email Simulator Panel */}
+                  {simulatedEmailOtp && (
+                    <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-3 border border-blue-500/20">
+                      <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-bold text-blue-500">Email Simulator Panel</h4>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Use this code to verify: <span className="font-mono font-bold text-blue-500 text-xs select-all">{simulatedEmailOtp}</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Role selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Account Type</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className={`flex items-center justify-center gap-2 p-3.5 rounded-xl border border-border cursor-pointer transition-all duration-200 ${selectedRole === 'customer' ? 'bg-primary/5 border-primary text-primary font-bold' : 'bg-background hover:bg-muted text-foreground'}`}>
+                    <input 
+                      type="radio" 
+                      value="customer" 
+                      className="sr-only" 
+                      {...register('role')} 
+                    />
+                    <span>Customer</span>
+                  </label>
+                  <label className={`flex items-center justify-center gap-2 p-3.5 rounded-xl border border-border cursor-pointer transition-all duration-200 ${selectedRole === 'provider' ? 'bg-primary/5 border-primary text-primary font-bold' : 'bg-background hover:bg-muted text-foreground'}`}>
+                    <input 
+                      type="radio" 
+                      value="provider" 
+                      className="sr-only" 
+                      {...register('role')} 
+                    />
+                    <span>Provider</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Service Category (for providers only) */}
+              {selectedRole === 'provider' && (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verification Code</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Service Category</label>
+                  <select
+                    className="flex h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    {...register('serviceCategory')}
+                  >
+                    <option value="Cleaning">Cleaning</option>
+                    <option value="Plumbing">Plumbing</option>
+                    <option value="Electrician">Electrician</option>
+                    <option value="Appliance Repair">Appliance Repair</option>
+                    <option value="Painting">Painting</option>
+                    <option value="Pest Control">Pest Control</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    type="text"
-                    maxLength={4}
-                    placeholder="Enter 4-digit OTP"
-                    className="text-center text-lg font-mono font-bold tracking-widest"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    type="password"
+                    placeholder="At least 6 characters"
+                    className="pl-10"
                     required
+                    {...register('password')}
                   />
                 </div>
+              </div>
 
-                <Button type="submit" size="lg" className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      Verify & Sign In
-                      <CheckCircle className="ml-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Confirm Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    placeholder="Repeat password"
+                    className="pl-10"
+                    required
+                    {...register('confirmPassword')}
+                  />
+                </div>
+              </div>
 
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  className="w-full rounded-xl text-muted-foreground"
-                  onClick={() => setStep(1)}
-                  disabled={loading}
-                >
-                  Back to Registration
-                </Button>
-              </form>
-            )}
+              {/* Submit button */}
+              <Button 
+                type="submit" 
+                size="lg" 
+                className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold mt-2" 
+                disabled={loading || !emailVerified}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Create Account
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </>
+                )}
+              </Button>
+            </form>
           </CardContent>
           <CardFooter className="flex flex-col space-y-2 text-center text-sm border-t border-border pt-4">
             <span className="text-muted-foreground">
