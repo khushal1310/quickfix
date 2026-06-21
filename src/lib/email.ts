@@ -66,8 +66,11 @@ export async function sendEmail({
  * Generates a premium, styled HTML email template for QuickFix OTP codes.
  */
 export function getOtpEmailTemplate(otpCode: string, userName: string, purpose: 'registration' | 'reset') {
-  const actionText = purpose === 'registration' ? 'વેરિફિકેશન કોડ' : 'પાસવર્ડ રીસેટ કોડ';
-  const titleText = purpose === 'registration' ? 'વેલકમ ટુ QuickFix!' : 'પાસવર્ડ રીસેટ વિનંતી';
+  const actionText = purpose === 'registration' ? 'Email Verification Code' : 'Password Reset Code';
+  const titleText = purpose === 'registration' ? 'Welcome to QuickFix!' : 'Password Reset Request';
+  const descriptionText = purpose === 'registration'
+    ? 'Please use the following verification code to verify your email address for your QuickFix account. This security code is valid for 15 minutes.'
+    : 'We received a request to reset the password for your QuickFix account. Please use the following security code to complete your password reset. This code is valid for 15 minutes.';
   
   return `
     <!DOCTYPE html>
@@ -166,9 +169,9 @@ export function getOtpEmailTemplate(otpCode: string, userName: string, purpose: 
           <h1>QUICKFIX</h1>
         </div>
         <div class="content">
-          <div class="greeting">નમસ્તે ${userName || 'યુઝર'},</div>
+          <div class="greeting">Hello ${userName || 'User'},</div>
           <div class="description">
-            QuickFix એપમાં તમારા ઈમેલ એડ્રેસને વેરિફાય કરવા માટે નીચેનો ${actionText} ઉપયોગ કરો. આ સુરક્ષા કોડ આગામી ૧૫ મિનિટ સુધી જ માન્ય છે.
+            ${descriptionText}
           </div>
           
           <div class="otp-container">
@@ -177,11 +180,11 @@ export function getOtpEmailTemplate(otpCode: string, userName: string, purpose: 
           </div>
           
           <p class="description">
-            જો તમે આ વિનંતી નથી કરી, તો તમે આ ઈમેલને અવગણી શકો છો. સુરક્ષા ખાતર આ કોડ કોઈની પણ સાથે શેર કરશો નહીં.
+            If you did not request this code, you can safely ignore this email. For security, do not share this code with anyone.
           </p>
           
           <div class="warning">
-            આ સિસ્ટમ દ્વારા જનરેટ થયેલો ઈમેલ છે. કૃપા કરીને આના પર રીપ્લાય ન કરશો.
+            This is a system generated email. Please do not reply to this message.
           </div>
         </div>
         <div class="footer">

@@ -32,12 +32,12 @@ export async function POST(req: NextRequest) {
     console.log(`[QuickFix Email Simulator] Signup OTP for ${emailStr}: ${otpCode}`);
 
     // Send the email via Brevo
-    const emailHtml = getOtpEmailTemplate(otpCode, 'યુઝર', 'registration');
+    const emailHtml = getOtpEmailTemplate(otpCode, 'User', 'registration');
     const emailResult = await sendEmail({
       to: emailStr,
-      subject: 'QuickFix ઇમેલ વેરિફિકેશન કોડ',
+      subject: 'QuickFix Email Verification Code',
       htmlContent: emailHtml,
-      textContent: `નમસ્તે, QuickFix સાઇન-અપ માટે તમારો વેરિફિકેશન કોડ છે: ${otpCode}`,
+      textContent: `Hello, your code to verify your email address is: ${otpCode}`,
     });
 
     if (!emailResult.success) {

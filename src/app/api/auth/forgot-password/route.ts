@@ -42,12 +42,12 @@ export async function POST(req: NextRequest) {
     console.log(`[QuickFix Email Simulator] Password Reset OTP for ${userEmail}: ${otpCode}`);
 
     // Send the email via Brevo
-    const emailHtml = getOtpEmailTemplate(otpCode, user.full_name || 'યુઝર', 'reset');
+    const emailHtml = getOtpEmailTemplate(otpCode, user.full_name || 'User', 'reset');
     const emailResult = await sendEmail({
       to: userEmail,
-      subject: 'QuickFix પાસવર્ડ રીસેટ કોડ',
+      subject: 'QuickFix Password Reset Code',
       htmlContent: emailHtml,
-      textContent: `નમસ્તે, તમારા પાસવર્ડને રીસેટ કરવા માટેનો વેરિફિકેશન કોડ છે: ${otpCode}`,
+      textContent: `Hello, your code to reset your password is: ${otpCode}`,
     });
 
     if (!emailResult.success) {
