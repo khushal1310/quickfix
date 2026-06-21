@@ -37,7 +37,6 @@ export default function RegisterPage() {
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [emailOtpCode, setEmailOtpCode] = useState('');
-  const [simulatedEmailOtp, setSimulatedEmailOtp] = useState<string | null>(null);
 
   const selectOAuthAccount = async (mobile: string) => {
     setOauthModal(null);
@@ -94,7 +93,6 @@ export default function RegisterPage() {
     try {
       const res = await sendEmailOtp(emailVal);
       if (res.success) {
-        setSimulatedEmailOtp(res.otp || null);
         setEmailOtpSent(true);
         toastSuccess('OTP code sent to your email!');
       } else {
@@ -278,19 +276,6 @@ export default function RegisterPage() {
                       </Button>
                     </div>
                   </div>
-
-                  {/* Email Simulator Panel */}
-                  {simulatedEmailOtp && (
-                    <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-3 border border-blue-500/20">
-                      <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="text-xs font-bold text-blue-500">Email Simulator Panel</h4>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Use this code to verify: <span className="font-mono font-bold text-blue-500 text-xs select-all">{simulatedEmailOtp}</span>
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 

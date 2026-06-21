@@ -4,15 +4,16 @@ import { sendEmail, getOtpEmailTemplate } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
-    const { mobileNumber } = await req.json();
+    const { mobileNumber, email } = await req.json();
+    const identifier = email || mobileNumber;
 
-    if (!mobileNumber) {
-      return NextResponse.json({ error: 'Mobile number is required.' }, { status: 400 });
+    if (!identifier) {
+      return NextResponse.json({ error: 'Email or mobile number is required.' }, { status: 400 });
     }
 
     // 1. Verify user exists
-    const isEmail = mobileNumber.includes('@');
-    const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
+    const isEmail = identifier.includes('@');
+    const inputIdentifier = isEmail ? identifier.toLowerCase().trim() : identifier.trim();
     
     let query = supabaseAdmin.from('users').select('id, email, mobile_number, full_name');
     if (isEmail) {
@@ -31,19 +32,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: isEmail ? 'No user registered with this email address.' : 'No user registered with this mobile number.' }, { status: 404 });
     }
 
-    const email = user.email;
-    if (!email) {
+    const userEmail = user.email;
+    if (!userEmail) {
       return NextResponse.json({ error: 'This account does not have a linked email address. Please contact support.' }, { status: 400 });
     }
 
     // 2. Generate 4-digit OTP
     const otpCode = Math.floor(1000 + Math.random() * 9000).toString();
-    console.log(`[QuickFix Email Simulator] Password Reset OTP for ${email}: ${otpCode}`);
+    console.log(`[QuickFix Email Simulator] Password Reset OTP for ${userEmail}: ${otpCode}`);
 
     // Send the email via Brevo
     const emailHtml = getOtpEmailTemplate(otpCode, user.full_name || 'યુઝર', 'reset');
     const emailResult = await sendEmail({
-      to: email,
+      to: userEmail,
       subject: 'QuickFix પાસવર્ડ રીસેટ કોડ',
       htmlContent: emailHtml,
       textContent: `નમસ્તે, તમારા પાસવર્ડને રીસેટ કરવા માટેનો વેરિફિકેશન કોડ છે: ${otpCode}`,
@@ -77,7 +78,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'OTP generated successfully. Check your email.',
-      otp: otpCode, // Exposed for development/testing ease
     });
   } catch (error: any) {
     console.error('Forgot Password API Error:', error);

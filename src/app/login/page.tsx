@@ -274,7 +274,15 @@ export default function LoginPage() {
 
               {/* Password input */}
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
+                  <Link 
+                    href="/forgot-password" 
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -374,7 +382,7 @@ export default function LoginPage() {
               className="flex items-center justify-center gap-2 py-1 text-sm font-bold text-foreground hover:underline transition-all"
             >
               <Search className="h-4 w-4 text-foreground stroke-[3px]" />
-              Find my account
+              Forgot Password?
             </Link>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4 text-center text-[10px] border-t border-border/60 pt-4 mt-2">

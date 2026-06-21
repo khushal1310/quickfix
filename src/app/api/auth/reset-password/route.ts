@@ -4,11 +4,12 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(req: NextRequest) {
   try {
-    const { mobileNumber, otpCode, newPassword } = await req.json();
+    const { mobileNumber, email, otpCode, newPassword } = await req.json();
+    const identifier = email || mobileNumber;
 
-    if (!mobileNumber || !otpCode || !newPassword) {
+    if (!identifier || !otpCode || !newPassword) {
       return NextResponse.json(
-        { error: 'Mobile number, OTP code, and new password are required.' },
+        { error: 'Email/Mobile number, OTP code, and new password are required.' },
         { status: 400 }
       );
     }
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Fetch OTP record
-    const isEmail = mobileNumber.includes('@');
-    const inputIdentifier = isEmail ? mobileNumber.toLowerCase().trim() : mobileNumber.trim();
+    const isEmail = identifier.includes('@');
+    const inputIdentifier = isEmail ? identifier.toLowerCase().trim() : identifier.trim();
 
     const { data: otpRecord, error: fetchError } = await supabaseAdmin
       .from('user_otps')

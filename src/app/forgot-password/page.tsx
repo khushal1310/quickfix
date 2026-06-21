@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Phone, Lock, HelpCircle, Info, Loader2, ArrowRight, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, HelpCircle, Info, Loader2, ArrowRight, CheckCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,7 @@ export default function ForgotPasswordPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [loading, setLoading] = useState(false);
-  const [mobileNum, setMobileNum] = useState('');
-  const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
 
   // Form states
   const [otpCode, setOtpCode] = useState('');
@@ -26,8 +25,8 @@ export default function ForgotPasswordPage() {
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mobileNum.length < 10) {
-      toastError('Please enter a valid mobile number.');
+    if (!email || !email.includes('@')) {
+      toastError('Please enter a valid email address.');
       return;
     }
 
@@ -36,13 +35,12 @@ export default function ForgotPasswordPage() {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileNumber: mobileNum }),
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
       });
       const data = await res.json();
 
       if (res.ok) {
-        setSimulatedOtp(data.otp || null);
-        toastSuccess('Password reset OTP generated!');
+        toastSuccess('Password reset OTP sent to your email!');
         setStep(2);
       } else {
         toastError(data.error || 'Failed to request reset.');
@@ -75,7 +73,7 @@ export default function ForgotPasswordPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mobileNumber: mobileNum,
+          email: email.toLowerCase().trim(),
           otpCode,
           newPassword,
         }),
@@ -120,24 +118,24 @@ export default function ForgotPasswordPage() {
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm">
               {step === 1 
-                ? 'Enter your registered mobile number to request a reset code sent to your registered email address.' 
+                ? 'Enter your registered email address to request a reset code.' 
                 : 'Enter the verification code sent to your email and choose a new password.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {step === 1 ? (
-              // Step 1: Input mobile number
+              // Step 1: Input email address
               <form onSubmit={handleRequestOtp} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Mobile Number</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                    <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      type="tel"
-                      placeholder="Enter mobile number"
+                      type="email"
+                      placeholder="Enter email address"
                       className="pl-10"
-                      value={mobileNum}
-                      onChange={(e) => setMobileNum(e.target.value)}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -160,18 +158,6 @@ export default function ForgotPasswordPage() {
             ) : (
               // Step 2: Input OTP & New Password
               <form onSubmit={handleResetSubmit} className="space-y-4">
-                {simulatedOtp && (
-                  <div className="flex items-start gap-3 rounded-xl bg-blue-500/10 p-4 border border-blue-500/20">
-                    <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-bold text-blue-500">Email Simulator Panel</h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Use this code (sent to registered email) to verify: <span className="font-mono font-bold text-blue-500 text-sm select-all">{simulatedOtp}</span>
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 {/* OTP Code */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verification Code</label>

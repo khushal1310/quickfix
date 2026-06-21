@@ -68,7 +68,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Signup email verification OTP generated successfully.',
-      otp: otpCode, // Exposed for development/testing ease
     });
   } catch (error: any) {
     console.error('Email OTP Request Error:', error);

@@ -103,6 +103,12 @@ export default function AccountPage() {
   const [editServiceCategory, setEditServiceCategory] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Email update verification states
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [emailVerifying, setEmailVerifying] = useState(false);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -267,11 +273,74 @@ export default function AccountPage() {
     }
   };
 
+  const handleSendEmailOtp = async () => {
+    if (!editEmail || !editEmail.includes('@')) {
+      toastError('Please enter a valid email address.');
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      const res = await fetch('/api/auth/email-otp-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: editEmail.toLowerCase().trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailOtpSent(true);
+        toastSuccess('Verification code sent to your email!');
+      } else {
+        toastError(data.error || 'Failed to send verification code.');
+      }
+    } catch (err: any) {
+      toastError(err.message || 'An error occurred.');
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async () => {
+    if (emailOtpCode.length < 4) {
+      toastError('Please enter the 4-digit verification code.');
+      return;
+    }
+
+    setEmailVerifying(true);
+    try {
+      const res = await fetch('/api/auth/email-otp-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: editEmail.toLowerCase().trim(),
+          otpCode: emailOtpCode
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setEmailVerified(true);
+        toastSuccess('Email verified successfully!');
+      } else {
+        toastError(data.error || 'Verification failed.');
+      }
+    } catch (err: any) {
+      toastError(err.message || 'An error occurred.');
+    } finally {
+      setEmailVerifying(false);
+    }
+  };
+
   // 1. Edit Profile Handler
   const handleEditProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editName.trim() || !editMobile.trim()) {
       toastError('Name and mobile number are required.');
+      return;
+    }
+
+    const hasEmailChanged = editEmail.toLowerCase().trim() !== (profile?.email || '').toLowerCase().trim();
+    if (hasEmailChanged && !emailVerified) {
+      toastError('Please verify your new email address first.');
       return;
     }
 
@@ -488,6 +557,20 @@ export default function AccountPage() {
     setActiveModal(modalName);
     setModalSearchQuery('');
     
+    if (modalName === 'edit-profile') {
+      setEmailOtpSent(false);
+      setEmailVerified(false);
+      setEmailOtpCode('');
+      setEmailVerifying(false);
+      if (profile) {
+        setEditEmail(profile.email || '');
+        setEditName(profile.fullName || '');
+        setEditMobile(profile.mobileNumber || '');
+        setEditImage(profile.profileImage || '');
+        setEditServiceCategory(profile.serviceCategory || '');
+      }
+    }
+
     // Check if the modal requires pulling a database list
     const lists = [
       'active-requests',
@@ -1027,13 +1110,64 @@ export default function AccountPage() {
                       required
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
-                    <Input 
-                      type="email" 
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                    />
+                    <div className="flex gap-2">
+                      <Input 
+                        type="email" 
+                        value={editEmail}
+                        onChange={(e) => {
+                          setEditEmail(e.target.value);
+                          setEmailVerified(false);
+                          setEmailOtpSent(false);
+                          setEmailOtpCode('');
+                        }}
+                        placeholder="Enter email address"
+                        className="flex-1"
+                        disabled={modalLoading || emailVerified}
+                      />
+                      {editEmail && editEmail.toLowerCase().trim() !== (profile?.email || '').toLowerCase().trim() && !emailVerified && (
+                        <Button
+                          type="button"
+                          onClick={handleSendEmailOtp}
+                          disabled={modalLoading || !editEmail.includes('@') || emailOtpSent}
+                          className="rounded-xl px-4 text-xs font-bold bg-primary text-white hover:bg-primary/90 h-10 shrink-0"
+                        >
+                          {emailOtpSent ? 'Sent' : 'Send Code'}
+                        </Button>
+                      )}
+                    </div>
+                    {emailVerified && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-500 mt-1">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>Email address verified!</span>
+                      </div>
+                    )}
+                    
+                    {/* Inline OTP Code Verification */}
+                    {editEmail && editEmail.toLowerCase().trim() !== (profile?.email || '').toLowerCase().trim() && !emailVerified && emailOtpSent && (
+                      <div className="mt-2 space-y-2 p-3 bg-muted/30 border border-border/80 rounded-xl">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email Verification Code</label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="text"
+                            maxLength={4}
+                            placeholder="Enter 4-digit code"
+                            className="text-center font-mono font-bold tracking-widest h-10"
+                            value={emailOtpCode}
+                            onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, ''))}
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleVerifyEmailOtp}
+                            disabled={modalLoading || emailOtpCode.length < 4 || emailVerifying}
+                            className="rounded-xl px-4 text-xs font-bold bg-primary text-white hover:bg-primary/90 h-10 shrink-0"
+                          >
+                            {emailVerifying ? 'Verifying...' : 'Verify'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">Profile Photo</label>
@@ -1083,7 +1217,11 @@ export default function AccountPage() {
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full rounded-xl mt-4 font-bold" disabled={modalLoading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full rounded-xl mt-4 font-bold" 
+                    disabled={modalLoading || (editEmail.toLowerCase().trim() !== (profile?.email || '').toLowerCase().trim() && !emailVerified)}
+                  >
                     {modalLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
                     Save Profile
                   </Button>
