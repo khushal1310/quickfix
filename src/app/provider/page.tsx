@@ -15,7 +15,7 @@ import {
   MapPin, Star, Phone, MessageSquare, AlertCircle, Sparkles, Eye, XCircle, ArrowUpRight, ArrowDownLeft, ArrowLeft,
   History, ChevronDown, ChevronUp, Wrench
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, getSyncedNow } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
 
@@ -180,7 +180,7 @@ export default function ProviderDashboard() {
   const [providerLng, setProviderLng] = useState<number>(72.5720);
 
   useEffect(() => {
-    fetchProviderData();
+    fetchProviderData(true);
   }, []);
 
   useEffect(() => {
@@ -252,31 +252,11 @@ export default function ProviderDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const fetchProviderData = async () => {
+  const fetchProviderData = async (isFull = false) => {
     if (!user) return;
 
     try {
-      const [
-        userProfileRes,
-        categoriesRes,
-        walletRes,
-        acceptsRes,
-        reqsRes,
-        ordersRes
-      ] = await Promise.all([
-        supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle(),
-        supabase
-          .from('service_categories')
-          .select('*'),
-        supabase
-          .from('wallets')
-          .select('*')
-          .eq('provider_id', user.id)
-          .maybeSingle(),
+      const promises: Promise<any>[] = [
         supabase
           .from('provider_accepts')
           .select('request_id, status')
@@ -290,32 +270,80 @@ export default function ProviderDashboard() {
           .select('*, request:service_requests(*), customer:users(*)')
           .eq('provider_id', user.id)
           .order('started_at', { ascending: false })
-      ]);
+      ];
 
-      const userProfile = userProfileRes.data;
-      if (userProfile) {
-        setDbUser(userProfile);
+      const shouldFetchProfile = isFull || !dbUser;
+      const shouldFetchCats = isFull || !providerCategory;
+      const shouldFetchWallet = isFull || !wallet;
+
+      if (shouldFetchProfile) {
+        promises.push(
+          supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+        );
+      }
+      if (shouldFetchCats) {
+        promises.push(
+          supabase
+            .from('service_categories')
+            .select('*')
+        );
+      }
+      if (shouldFetchWallet) {
+        promises.push(
+          supabase
+            .from('wallets')
+            .select('*')
+            .eq('provider_id', user.id)
+            .maybeSingle()
+        );
       }
 
-      // Populate category logic if needed (matching categories to user service category)
-      const cats = categoriesRes.data;
-      let categoryObj = null;
+      const results = await Promise.all(promises);
+
+      const acceptsRes = results[0];
+      const reqsRes = results[1];
+      const ordersRes = results[2];
+
+      let idx = 3;
+      let userProfile = dbUser;
+      if (shouldFetchProfile) {
+        userProfile = results[idx]?.data;
+        if (userProfile) {
+          setDbUser(userProfile);
+        }
+        idx++;
+      }
+
+      let cats = null;
+      if (shouldFetchCats) {
+        cats = results[idx]?.data;
+        idx++;
+      }
+
       if (cats && userProfile) {
-        const matched = cats.find(c => c.name.toLowerCase() === (userProfile.service_category || 'cleaning').toLowerCase());
-        categoryObj = matched || cats.find(c => c.name.toLowerCase() === 'cleaning');
+        const matched = cats.find((c: any) => c.name.toLowerCase() === (userProfile.service_category || 'cleaning').toLowerCase());
+        const categoryObj = matched || cats.find((c: any) => c.name.toLowerCase() === 'cleaning');
+        setProviderCategory(categoryObj);
       }
 
-      const wlt = walletRes.data;
-      if (wlt) {
-        setWallet(wlt);
+      if (shouldFetchWallet) {
+        const wlt = results[idx]?.data;
+        if (wlt) {
+          setWallet(wlt);
 
-        // Fetch Wallet Transactions
-        const { data: txns } = await supabase
-          .from('wallet_transactions')
-          .select('*')
-          .eq('wallet_id', wlt.id)
-          .order('created_at', { ascending: false });
-        setTransactions(txns || []);
+          // Fetch Wallet Transactions
+          const { data: txns } = await supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('wallet_id', wlt.id)
+            .order('created_at', { ascending: false });
+          setTransactions(txns || []);
+        }
+        idx++;
       }
 
       const accepts = acceptsRes.data;
@@ -329,7 +357,7 @@ export default function ProviderDashboard() {
         const filteredReqs = reqs.filter(r => {
           if (rejectedIds.includes(r.id)) return false;
           
-          const elapsedSeconds = (Date.now() - new Date(r.created_at || new Date()).getTime()) / 1000;
+          const elapsedSeconds = (getSyncedNow() - new Date(r.created_at || new Date()).getTime()) / 1000;
           
           // 1. Hide requests older than 5 minutes (300 seconds)
           if (elapsedSeconds > 300) return false;
@@ -520,7 +548,7 @@ export default function ProviderDashboard() {
     if (dismissedPopups.includes(req.id)) return false;
 
     // Check if within 10 seconds window
-    const elapsedSeconds = (Date.now() - new Date(req.created_at || new Date()).getTime()) / 1000;
+    const elapsedSeconds = (getSyncedNow() - new Date(req.created_at || new Date()).getTime()) / 1000;
     if (elapsedSeconds > 10) return false;
 
     // Check if within 1.0 km
@@ -537,7 +565,7 @@ export default function ProviderDashboard() {
     if (acceptedRequestsIds.includes(req.id)) return false;
     if (dismissedPopups.includes(req.id)) return false;
 
-    const elapsedSeconds = (Date.now() - new Date(req.created_at || new Date()).getTime()) / 1000;
+    const elapsedSeconds = (getSyncedNow() - new Date(req.created_at || new Date()).getTime()) / 1000;
     
     // 1. Hide requests older than 5 minutes
     if (elapsedSeconds > 300) return false;
@@ -562,7 +590,7 @@ export default function ProviderDashboard() {
   // Auto-dismiss popup if 10-second accept window expires
   useEffect(() => {
     if (activeIncomingRequest) {
-      const elapsedSeconds = (Date.now() - new Date(activeIncomingRequest.created_at || new Date()).getTime()) / 1000;
+      const elapsedSeconds = (getSyncedNow() - new Date(activeIncomingRequest.created_at || new Date()).getTime()) / 1000;
       if (elapsedSeconds > 10) {
         setDismissedPopups(prev => {
           if (prev.includes(activeIncomingRequest.id)) return prev;
@@ -1072,7 +1100,7 @@ export default function ProviderDashboard() {
 
       {/* FULL-SCREEN INCOMING REQUEST POPUP OVERLAY */}
       {activeIncomingRequest && (() => {
-        const elapsed = (Date.now() - new Date(activeIncomingRequest.created_at || new Date()).getTime()) / 1000;
+        const elapsed = (getSyncedNow() - new Date(activeIncomingRequest.created_at || new Date()).getTime()) / 1000;
         const remainingTime = Math.max(0, Math.ceil(10 - elapsed));
         const distanceVal = activeIncomingRequest.latitude !== undefined && activeIncomingRequest.longitude !== undefined && providerLat && providerLng
           ? getDistanceKm(providerLat, providerLng, activeIncomingRequest.latitude, activeIncomingRequest.longitude)

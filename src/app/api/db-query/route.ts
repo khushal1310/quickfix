@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({ data: records });
+      return NextResponse.json({ data: records, serverTime: new Date().toISOString() });
     }
 
     if (action === 'insert') {
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
       }
 
       await col.insertMany(inserted);
-      return NextResponse.json({ data: inserted });
+      return NextResponse.json({ data: inserted, serverTime: new Date().toISOString() });
     }
 
     if (action === 'update') {
@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
       );
 
       const updatedList = await col.find({ id: { $in: ids } }).toArray();
-      return NextResponse.json({ data: updatedList });
+      return NextResponse.json({ data: updatedList, serverTime: new Date().toISOString() });
     }
 
     if (action === 'upsert') {
@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      return NextResponse.json({ data: upserted });
+      return NextResponse.json({ data: upserted, serverTime: new Date().toISOString() });
     }
 
     if (action === 'delete') {
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
       }
 
       const deleteResult = await col.deleteMany(targetQuery);
-      return NextResponse.json({ data: { success: true, count: deleteResult.deletedCount } });
+      return NextResponse.json({ data: { success: true, count: deleteResult.deletedCount }, serverTime: new Date().toISOString() });
     }
 
     return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });

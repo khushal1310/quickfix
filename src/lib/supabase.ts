@@ -140,6 +140,9 @@ class MockSupabaseQueryBuilder {
       if (!res.ok) {
         return { data: null, error: new Error(data.error || 'Query failed') };
       }
+      if (data.serverTime && typeof window !== 'undefined') {
+        (window as any).__qf_server_time_offset = Date.now() - new Date(data.serverTime).getTime();
+      }
       return { data: data.data, error: null };
     } catch (err: any) {
       return { data: null, error: err };

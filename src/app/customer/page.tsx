@@ -17,7 +17,7 @@ import {
   MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History,
   Home, Briefcase, ArrowLeft, Clock
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, getSyncedNow } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
 import { TiltCard } from '@/components/ui/TiltCard';
 
@@ -377,7 +377,7 @@ export default function CustomerDashboard() {
     fetchCategories();
 
     // Fetch customer requests & orders
-    fetchCustomerData();
+    fetchCustomerData(true);
 
     // Realtime channel subscriptions
     const requestsChannel = supabase
@@ -417,7 +417,7 @@ export default function CustomerDashboard() {
         if (req.status !== 'OPEN' && req.status !== 'ACCEPTED') return false;
         
         // Calculate elapsed seconds since creation
-        const elapsed = (Date.now() - new Date(req.created_at).getTime()) / 1000;
+        const elapsed = (getSyncedNow() - new Date(req.created_at).getTime()) / 1000;
         return elapsed > 300; // 5 minutes
       });
 
@@ -449,16 +449,11 @@ export default function CustomerDashboard() {
     return () => clearInterval(interval);
   }, [user, activeRequests]);
 
-  const fetchCustomerData = async () => {
+  const fetchCustomerData = async (isFull = false) => {
     if (!user) return;
     
     try {
-      const [profileRes, reqsRes, ordsRes, compOrdsRes] = await Promise.all([
-        supabase
-          .from('users')
-          .select('addresses')
-          .eq('id', user.id)
-          .maybeSingle(),
+      const promises: Promise<any>[] = [
         supabase
           .from('service_requests')
           .select('*, category:service_categories(*), request_images(*), provider_accepts(count)')
@@ -477,10 +472,30 @@ export default function CustomerDashboard() {
           .eq('customer_id', user.id)
           .in('status', ['AUTOCOMPLETED', 'CANCELLED'])
           .order('completed_at', { ascending: false })
-      ]);
+      ];
 
-      if (profileRes.data && profileRes.data.addresses) {
-        setSavedAddresses(profileRes.data.addresses);
+      const shouldFetchProfile = isFull || savedAddresses.length === 0;
+      if (shouldFetchProfile) {
+        promises.push(
+          supabase
+            .from('users')
+            .select('addresses')
+            .eq('id', user.id)
+            .maybeSingle()
+        );
+      }
+
+      const results = await Promise.all(promises);
+
+      const reqsRes = results[0];
+      const ordsRes = results[1];
+      const compOrdsRes = results[2];
+
+      if (shouldFetchProfile) {
+        const profileRes = results[3];
+        if (profileRes?.data && profileRes.data.addresses) {
+          setSavedAddresses(profileRes.data.addresses);
+        }
       }
 
       const reqs = reqsRes.data;
@@ -1378,7 +1393,7 @@ export default function CustomerDashboard() {
                   <div className="space-y-4">
                     {activeOrders.map((order) => {
                       const createdAtTime = new Date(order.created_at).getTime();
-                      const elapsedSec = Math.floor((Date.now() - createdAtTime) / 1000);
+                      const elapsedSec = Math.floor((getSyncedNow() - createdAtTime) / 1000);
                       const remainingSec = Math.max(0, 60 - elapsedSec);
 
                       return (

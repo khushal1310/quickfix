@@ -24,3 +24,12 @@ export function formatDate(dateString: string): string {
     timeStyle: 'short',
   }).format(date);
 }
+
+// Get synced current timestamp based on server offset
+export function getSyncedNow(): number {
+  if (typeof window !== 'undefined' && (window as any).__qf_server_time_offset !== undefined) {
+    return Date.now() - (window as any).__qf_server_time_offset;
+  }
+  return Date.now();
+}
+
