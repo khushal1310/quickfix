@@ -418,7 +418,7 @@ export default function CustomerDashboard() {
         
         // Calculate elapsed seconds since creation
         const elapsed = (getSyncedNow() - new Date(req.created_at).getTime()) / 1000;
-        return elapsed > 7200; // 2 hours
+        return elapsed > 300; // 5 minutes
       });
 
       if (expired.length === 0) return;
@@ -788,6 +788,44 @@ export default function CustomerDashboard() {
       fetchCustomerData();
     } catch (err: any) {
       toastError(err.message || 'Failed to submit request.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cancel Request action
+  const handleCancelRequest = async (requestId: string) => {
+    if (!confirm('Are you sure you want to cancel this request?')) return;
+    setLoading(true);
+    try {
+      // 1. Fetch latest request status
+      const { data: request, error: fetchError } = await supabase
+        .from('service_requests')
+        .select('status')
+        .eq('id', requestId)
+        .maybeSingle();
+        
+      if (fetchError) throw fetchError;
+      
+      if (!request) {
+        throw new Error('Request not found.');
+      }
+      
+      if (request.status !== 'OPEN') {
+        throw new Error('This request has already been accepted by a provider and cannot be cancelled.');
+      }
+      
+      // 2. Perform cancellation
+      const { error } = await supabase
+        .from('service_requests')
+        .update({ status: 'CANCELLED' })
+        .eq('id', requestId);
+
+      if (error) throw error;
+      toastSuccess('Service request cancelled successfully.');
+      fetchCustomerData();
+    } catch (err: any) {
+      toastError(err.message || 'Failed to cancel service request.');
     } finally {
       setLoading(false);
     }
@@ -1365,9 +1403,23 @@ export default function CustomerDashboard() {
                               )}
                             </div>
                             {(req.status === 'OPEN' || req.status === 'ACCEPTED') && (
-                              <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-primary bg-primary/5 border border-primary/20 p-2.5 rounded-xl animate-pulse w-full justify-center">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                <span>Searching for nearby providers within 1km...</span>
+                              <div className="flex flex-col gap-3 mt-4">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-primary bg-primary/5 border border-primary/20 p-2.5 rounded-xl animate-pulse w-full justify-center">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  <span>Searching for nearby providers within 1km...</span>
+                                </div>
+                                {req.status === 'OPEN' && (
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleCancelRequest(req.id)}
+                                    className="w-full rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold h-10 text-xs transition-colors"
+                                    disabled={loading}
+                                  >
+                                    Cancel Request
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </CardContent>
