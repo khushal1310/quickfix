@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
       profileImage: userRecord.profile_image,
       createdAt: userRecord.created_at,
       custom_user_id: userRecord.custom_user_id,
+      kycStatus: userRecord.kyc_status || 'unverified',
     };
 
     const response = NextResponse.json({

@@ -356,8 +356,8 @@ export default function ProviderDashboard() {
           
           const elapsedSeconds = (getSyncedNow() - new Date(r.created_at || new Date()).getTime()) / 1000;
           
-          // 1. Hide requests older than 5 minutes (300 seconds)
-          if (elapsedSeconds > 300) return false;
+          // 1. Hide requests older than 2 hours (7200 seconds)
+          if (elapsedSeconds > 7200) return false;
           
           // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
           let limit = 5.0;
@@ -564,8 +564,8 @@ export default function ProviderDashboard() {
 
     const elapsedSeconds = (getSyncedNow() - new Date(req.created_at || new Date()).getTime()) / 1000;
     
-    // 1. Hide requests older than 5 minutes
-    if (elapsedSeconds > 300) return false;
+    // 1. Hide requests older than 2 hours
+    if (elapsedSeconds > 7200) return false;
 
     // 2. Radial dispatch logic: <= 10s is 1km, <= 20s is 5km, > 20s is 500km (unlimited for testing)
     let limit = 5.0;

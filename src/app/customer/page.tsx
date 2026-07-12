@@ -418,7 +418,7 @@ export default function CustomerDashboard() {
         
         // Calculate elapsed seconds since creation
         const elapsed = (getSyncedNow() - new Date(req.created_at).getTime()) / 1000;
-        return elapsed > 300; // 5 minutes
+        return elapsed > 7200; // 2 hours
       });
 
       if (expired.length === 0) return;

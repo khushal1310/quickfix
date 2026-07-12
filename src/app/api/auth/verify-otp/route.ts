@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
       createdAt: newUser.created_at,
       dob: newUser.dob || null,
       custom_user_id: newUser.custom_user_id,
+      kycStatus: newUser.kyc_status || 'unverified',
     };
 
     const response = NextResponse.json({

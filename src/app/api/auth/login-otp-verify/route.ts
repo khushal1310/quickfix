@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       createdAt: userRecord.created_at,
       dob: userRecord.dob || null,
       custom_user_id: userRecord.custom_user_id,
+      kycStatus: userRecord.kyc_status || 'unverified',
     };
 
     const response = NextResponse.json({
