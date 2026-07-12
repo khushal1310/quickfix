@@ -179,9 +179,6 @@ export default function ProviderDashboard() {
   const [providerLat, setProviderLat] = useState<number>(23.0240);
   const [providerLng, setProviderLng] = useState<number>(72.5720);
 
-  useEffect(() => {
-    fetchProviderData(true);
-  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -222,7 +219,7 @@ export default function ProviderDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    fetchProviderData();
+    fetchProviderData(true);
 
     // Set up real-time subscriptions
     const providerChannel = supabase

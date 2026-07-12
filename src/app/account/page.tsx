@@ -662,6 +662,8 @@ export default function AccountPage() {
         u.kycStatus = 'verified';
         u.verificationStatus = 'verified';
         localStorage.setItem('qf_user', JSON.stringify(u));
+        // Update Zustand state
+        useAuth.setState({ user: u });
       }
 
       toastSuccess('Aadhaar KYC Verification Successful!');
