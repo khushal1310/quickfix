@@ -48,7 +48,7 @@ export function Navbar() {
           <Link href={isAuthenticated && user ? `/${user.role}` : "/"} className="flex items-center gap-2 select-none">
             <motion.span whileHover={{ rotate: 12 }} className="insta-gradient p-1.5 rounded-lg text-white block">
               <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c0-1.1.9-2 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
               </svg>
             </motion.span>
             <span className="text-xl font-black tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">

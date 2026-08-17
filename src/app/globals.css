@@ -80,13 +80,13 @@ body {
   animation: shimmer 1.5s infinite linear;
 }
 
-/* Instagram Gradient Background */
+/* Premium Brand Gradient Background */
 .insta-gradient {
-  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
 }
 
 .insta-text-gradient {
-  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 50%, #db2777 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
