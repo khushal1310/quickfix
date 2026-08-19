@@ -1,0 +1,10 @@
+{
+  "appId": "com.quickfix.app",
+  "appName": "QuickFix",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://officialquickfix.netlify.app",
+    "cleartext": true
+  }
+}
