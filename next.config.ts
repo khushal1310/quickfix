@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     // Ignore type errors during build for dynamic database types
     ignoreBuildErrors: true,
   },
+  env: {
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: "1036720648609-5qd5pd39068lokenpvg25hl25hjt0pm8.apps.googleusercontent.com",
+  },
 };
 
 export default nextConfig;
