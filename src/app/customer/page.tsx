@@ -20,6 +20,7 @@ import {
 import { formatCurrency, formatDate, getSyncedNow } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
 import { TiltCard } from '@/components/ui/TiltCard';
+import { getTranslation } from '@/lib/translations';
 
 // Client-side image resizer and compressor to enable instant uploads
 function compressImage(file: File): Promise<File> {
@@ -297,6 +298,27 @@ export default function CustomerDashboard() {
   const [reqLatitude, setReqLatitude] = useState<number | null>(null);
   const [reqLongitude, setReqLongitude] = useState<number | null>(null);
   const [upiOrder, setUpiOrder] = useState<any | null>(null);
+  const [addressSearchQuery, setAddressSearchQuery] = useState('');
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [searchingAddress, setSearchingAddress] = useState(false);
+  const [lang, setLang] = useState<'en' | 'gu' | 'hi'>('en');
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem('qf_lang') as any;
+    if (savedLang) setLang(savedLang);
+
+    const handleLangChange = () => {
+      const updatedLang = localStorage.getItem('qf_lang') as any;
+      if (updatedLang) setLang(updatedLang);
+    };
+
+    window.addEventListener('qf_language_changed', handleLangChange);
+    return () => {
+      window.removeEventListener('qf_language_changed', handleLangChange);
+    };
+  }, []);
+
+  const t = (key: any): string => getTranslation(key, lang);
 
   // Automatically query user geolocation on page load
   useEffect(() => {
@@ -324,6 +346,42 @@ export default function CustomerDashboard() {
       );
     }
   }, [user]);
+
+  const handleAddressSearchChange = async (query: string) => {
+    setAddressSearchQuery(query);
+    if (query.trim().length < 3) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    setSearchingAddress(true);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&q=${encodeURIComponent(query)}&limit=5&countrycodes=in`);
+      if (res.ok) {
+        const data = await res.json();
+        setAddressSuggestions(data || []);
+      }
+    } catch (e) {
+      console.error('OSM Nominatim fetch error:', e);
+    } finally {
+      setSearchingAddress(false);
+    }
+  };
+
+  const handleSelectSuggestion = (suggestion: any) => {
+    const displayName = suggestion.display_name;
+    const lat = parseFloat(suggestion.lat);
+    const lon = parseFloat(suggestion.lon);
+    const addrObj = suggestion.address || {};
+    const cityName = addrObj.city || addrObj.town || addrObj.village || addrObj.suburb || addrObj.state_district || 'Ahmedabad';
+
+    setArea(displayName);
+    setCity(cityName);
+    setReqLatitude(lat);
+    setReqLongitude(lon);
+    setAddressSearchQuery(displayName);
+    setAddressSuggestions([]);
+  };
 
   // Address Manager Add Form states
   const [mgrLabel, setMgrLabel] = useState('Home');
@@ -1042,7 +1100,7 @@ export default function CustomerDashboard() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Plus className="h-5 w-5 text-primary" />
-                      Create Request
+                      {t('createRequest')}
                     </CardTitle>
                     <CardDescription>Post a service request to nearby professionals.</CardDescription>
                   </CardHeader>
@@ -1050,7 +1108,7 @@ export default function CustomerDashboard() {
                   <form onSubmit={handleCreateRequest} className="space-y-4">
                     {/* Category */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('selectCategory')}</label>
                       <select
                         className="flex h-11 w-full rounded-xl border border-border bg-card px-4 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                         value={selectedCategory}
@@ -1065,7 +1123,7 @@ export default function CustomerDashboard() {
 
                     {/* Description */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Task Description</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('describeTask')}</label>
                       <textarea
                         rows={3}
                         placeholder="Explain what needs to be done..."
@@ -1079,7 +1137,7 @@ export default function CustomerDashboard() {
                     {/* Location Info */}
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select Service Location</label>
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('searchAddress')}</label>
                         <button 
                           type="button" 
                           onClick={() => setAddressManagerOpen(true)}
@@ -1169,6 +1227,36 @@ export default function CustomerDashboard() {
                             </Button>
                           </div>
                           
+                          {/* OpenStreetMap Auto Search */}
+                          <div className="space-y-1 relative">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Search Address (OpenStreetMap Autocomplete)</label>
+                            <div className="relative">
+                              <Input
+                                placeholder="Type to search e.g. Ahmedabad, Bhavnagar..."
+                                value={addressSearchQuery}
+                                onChange={(e) => handleAddressSearchChange(e.target.value)}
+                              />
+                              {searchingAddress && (
+                                <span className="absolute right-3 top-3 text-[10px] text-muted-foreground animate-pulse">Searching...</span>
+                              )}
+                            </div>
+                            
+                            {addressSuggestions.length > 0 && (
+                              <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-border bg-card shadow-lg p-1.5 space-y-1">
+                                {addressSuggestions.map((suggestion, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleSelectSuggestion(suggestion)}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-muted/80 rounded-lg text-foreground transition-all truncate block"
+                                  >
+                                    📍 {suggestion.display_name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Flat / House No. / Building</label>
@@ -1294,7 +1382,7 @@ export default function CustomerDashboard() {
 
                     {/* Budget */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget (₹, Optional)</label>
+                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('setBudget')}</label>
                       <Input
                         type="number"
                         placeholder="e.g. 150"
@@ -1348,7 +1436,7 @@ export default function CustomerDashboard() {
                           Submitting...
                         </>
                       ) : (
-                        'Submit Request'
+                        t('postRequestBtn')
                       )}
                     </Button>
                   </form>
@@ -1363,12 +1451,12 @@ export default function CustomerDashboard() {
               <div className="space-y-4">
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Active Requests ({activeRequests.length})
+                  {t('openRequests')} ({activeRequests.length})
                 </h3>
 
                 {activeRequests.length === 0 ? (
                   <Card className="border-border bg-card p-8 text-center text-muted-foreground">
-                    <p className="text-sm">No active service requests. Create one to get started!</p>
+                    <p className="text-sm">{t('noOpenRequests')}</p>
                   </Card>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1498,18 +1586,6 @@ export default function CustomerDashboard() {
                                 </Button>
                               )}
 
-                              {/* Pay via UPI */}
-                              {(order.status === 'SELECTED' || order.status === 'IN_PROGRESS' || order.status === 'COMPLETED') && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  className="rounded-lg border-primary text-primary hover:bg-primary/5 font-bold flex items-center gap-1.5 h-9"
-                                  onClick={() => setUpiOrder(order)}
-                                >
-                                  <DollarSign className="h-4 w-4" />
-                                  Pay via UPI
-                                </Button>
-                              )}
 
                               {/* Raise Dispute */}
                               {order.status !== 'DISPUTED' && order.status !== 'CANCELLED' && (

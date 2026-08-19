@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sun, Moon, LogOut, LayoutDashboard, Wallet, User as UserIcon } from 'lucide-react';
+import { Sun, Moon, LogOut, LayoutDashboard, Wallet, User as UserIcon, Globe } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
@@ -12,6 +12,7 @@ export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
   const router = useRouter();
   const [dark, setDark] = useState(false);
+  const [lang, setLang] = useState<'en' | 'gu' | 'hi'>('en');
 
   useEffect(() => {
     // Initial theme check
@@ -21,7 +22,19 @@ export function Navbar() {
       document.documentElement.classList.add('dark');
       setDark(true);
     }
+    
+    // Initial language check
+    const savedLang = localStorage.getItem('qf_lang') as any;
+    if (savedLang) {
+      setLang(savedLang);
+    }
   }, []);
+
+  const changeLanguage = (newLang: 'en' | 'gu' | 'hi') => {
+    setLang(newLang);
+    localStorage.setItem('qf_lang', newLang);
+    window.dispatchEvent(new Event('qf_language_changed'));
+  };
 
   const toggleTheme = () => {
     if (dark) {
@@ -66,6 +79,20 @@ export function Navbar() {
           >
             {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
+
+          {/* Language Switcher */}
+          <div className="flex items-center gap-1.5 bg-muted/40 hover:bg-muted/80 rounded-xl px-2 py-1.5 border border-border transition-all cursor-pointer">
+            <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <select
+              className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer pr-1"
+              value={lang}
+              onChange={(e) => changeLanguage(e.target.value as any)}
+            >
+              <option value="en" className="bg-card text-foreground">EN</option>
+              <option value="gu" className="bg-card text-foreground">ગુજરાતી</option>
+              <option value="hi" className="bg-card text-foreground">हिंदी</option>
+            </select>
+          </div>
 
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">

@@ -18,6 +18,8 @@ import {
 import { formatCurrency, formatDate, getSyncedNow } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import { getTranslation } from '@/lib/translations';
 
 // Haversine formula to calculate distance in km
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -150,6 +152,36 @@ export default function ProviderDashboard() {
 
   // 1-second timer state to drive the ticking countdowns and map route updates
   const [timeTick, setTimeTick] = useState(0);
+
+  const [lang, setLang] = useState<'en' | 'gu' | 'hi'>('en');
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem('qf_lang') as any;
+    if (savedLang) setLang(savedLang);
+
+    const handleLangChange = () => {
+      const updatedLang = localStorage.getItem('qf_lang') as any;
+      if (updatedLang) setLang(updatedLang);
+    };
+
+    window.addEventListener('qf_language_changed', handleLangChange);
+    return () => {
+      window.removeEventListener('qf_language_changed', handleLangChange);
+    };
+  }, []);
+
+  const t = (key: any): string => getTranslation(key, lang);
+
+  // Request notifications permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      LocalNotifications.requestPermissions().then((res) => {
+        console.log('Local notifications permissions standard:', res.display);
+      }).catch((e) => {
+        console.warn('Local notifications request permission failed:', e);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -392,6 +424,21 @@ export default function ProviderDashboard() {
           newReqs.forEach(req => {
             toastSuccess(`New nearby task: ${req.category?.name || 'Service Requested'} (₹${req.budget || ''})`);
           });
+
+          // Schedule local notifications for background/system integration
+          try {
+            LocalNotifications.schedule({
+              notifications: newReqs.map((req, index) => ({
+                title: `🛠️ New Service Request Nearby!`,
+                body: `${req.category?.name || 'Helper Request'} in ${req.city || 'your area'} (₹${req.budget || 'Open Budget'})`,
+                id: Math.floor(Math.random() * 1000000) + index,
+                schedule: { at: new Date(Date.now() + 100) },
+                sound: 'beep.wav'
+              }))
+            });
+          } catch (err) {
+            console.warn('Capacitor LocalNotifications schedule bypassed:', err);
+          }
         }
         
         prevRequestIdsRef.current = currentIds;
@@ -659,14 +706,14 @@ export default function ProviderDashboard() {
               onClick={() => setActiveTab('nearby')}
               className="rounded-xl font-bold"
             >
-              Nearby Requests
+              {t('nearbyTasks')}
             </Button>
             <Button 
               variant={activeTab === 'assigned' ? 'default' : 'outline'} 
               onClick={() => setActiveTab('assigned')}
               className="rounded-xl font-bold"
             >
-              Assigned Jobs ({assignedOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'AUTOCOMPLETED' && o.status !== 'CANCELLED').length})
+              {t('assignedOrders')} ({assignedOrders.filter(o => o.status !== 'COMPLETED' && o.status !== 'AUTOCOMPLETED' && o.status !== 'CANCELLED').length})
             </Button>
           </div>
 
@@ -693,13 +740,13 @@ export default function ProviderDashboard() {
             <div className="flex flex-wrap justify-between items-center gap-4">
               <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                Service Requests Nearby ({nearbyRequests.length})
+                {t('nearbyTasks')} ({nearbyRequests.length})
               </h3>
             </div>
 
             {nearbyRequests.length === 0 ? (
               <Card className="border-border bg-card p-12 text-center text-muted-foreground">
-                <p className="text-sm">No service requests nearby right now. We&apos;ll update in real-time as they appear!</p>
+                <p className="text-sm">{t('noNearbyTasks')}</p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -760,7 +807,7 @@ export default function ProviderDashboard() {
                           onClick={() => handleRejectRequest(req.id)}
                           disabled={loading}
                         >
-                          Hide
+                          {t('declineBtn')}
                         </Button>
                         <div className="flex-1 w-full">
                           {isKycVerified ? (
