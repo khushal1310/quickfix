@@ -122,9 +122,15 @@ class MockSupabaseQueryBuilder {
 
   private async execute(action: string) {
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('qf_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/db-query', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           action,
           table: this.table,

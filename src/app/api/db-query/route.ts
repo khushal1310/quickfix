@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb, getNextCustomUserId } from '@/lib/mongodb';
+import { getDb } from '@/lib/mongodb';
+import { verifyJWT } from '@/lib/jwt';
+
+function sanitizeUser(u: any) {
+  if (!u) return;
+  delete u.password_hash;
+  delete u.passwordHash;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,6 +14,178 @@ export async function POST(req: NextRequest) {
 
     const mongoDb = await getDb();
     const col = mongoDb.collection(table);
+
+    // 1. Authenticate JWT token
+    const authHeader = req.headers.get('Authorization');
+    let userId: string | null = null;
+    let userRole: string | null = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = await verifyJWT(token);
+      if (decoded) {
+        userId = decoded.sub as string;
+        userRole = decoded.user_metadata?.role as string;
+      }
+    }
+
+    // 2. Table-level Access Control (ACL)
+    const publicReadTables = ['service_categories', 'platform_reviews'];
+    const publicWriteTables = ['platform_reviews'];
+
+    const isPublicRead = action === 'select' && publicReadTables.includes(table);
+    const isPublicWrite = action === 'insert' && publicWriteTables.includes(table);
+
+    if (!isPublicRead && !isPublicWrite && !userId) {
+      return NextResponse.json({ error: 'Unauthorized. Missing or invalid security token.' }, { status: 401 });
+    }
+
+    // 3. Row-level Security (RLS) & Access Control Policies
+    const isAdmin = userRole === 'admin';
+
+    if (!isAdmin && userId) {
+      // Parse query filters into helper dictionary for easier checks
+      const filterMap: Record<string, any> = {};
+      if (filters && Array.isArray(filters)) {
+        for (const f of filters) {
+          if (f.op === 'eq') filterMap[f.column] = f.value;
+        }
+      }
+
+      if (table === 'users') {
+        if (action === 'delete') {
+          return NextResponse.json({ error: 'Forbidden. Only administrators can delete users.' }, { status: 403 });
+        }
+        if (action === 'insert') {
+          if (data && data.role === 'admin') {
+            return NextResponse.json({ error: 'Forbidden. Cannot register admin user.' }, { status: 403 });
+          }
+        }
+        if (action === 'update') {
+          const targetId = id || filterMap['id'];
+          if (targetId !== userId) {
+            return NextResponse.json({ error: 'Forbidden. You can only update your own profile.' }, { status: 403 });
+          }
+          if (data && data.role && data.role !== userRole) {
+            return NextResponse.json({ error: 'Forbidden. Cannot modify your user role.' }, { status: 403 });
+          }
+        }
+      }
+
+      if (table === 'wallets') {
+        if (action === 'select' || action === 'update') {
+          const targetId = id || filterMap['id'];
+          const targetProvider = filterMap['provider_id'];
+          
+          if (targetId && targetId !== `wallet-${userId}`) {
+            return NextResponse.json({ error: 'Forbidden. You can only access your own wallet.' }, { status: 403 });
+          }
+          if (targetProvider && targetProvider !== userId) {
+            return NextResponse.json({ error: 'Forbidden. You can only access your own wallet.' }, { status: 403 });
+          }
+        } else {
+          return NextResponse.json({ error: 'Forbidden. Wallet modifications are restricted.' }, { status: 403 });
+        }
+      }
+
+      if (table === 'wallet_transactions') {
+        if (action === 'select') {
+          const targetWalletId = filterMap['wallet_id'];
+          if (targetWalletId && targetWalletId !== `wallet-${userId}`) {
+            return NextResponse.json({ error: 'Forbidden. You can only view your own wallet transactions.' }, { status: 403 });
+          }
+        } else {
+          return NextResponse.json({ error: 'Forbidden. Only system tasks can record transactions.' }, { status: 403 });
+        }
+      }
+
+      if (table === 'service_requests') {
+        if (action === 'insert' || action === 'update' || action === 'delete') {
+          if (data && data.customer_id && data.customer_id !== userId) {
+            return NextResponse.json({ error: 'Forbidden. Customer ID mismatch.' }, { status: 403 });
+          }
+          const targetId = id || filterMap['id'];
+          if (targetId) {
+            const reqRecord = await mongoDb.collection('service_requests').findOne({ id: targetId });
+            if (reqRecord && reqRecord.customer_id !== userId) {
+              return NextResponse.json({ error: 'Forbidden. You do not own this request.' }, { status: 403 });
+            }
+          }
+        }
+        if (action === 'select') {
+          const isProvider = userRole === 'provider';
+          const targetCustomer = filterMap['customer_id'];
+          
+          if (!isProvider) {
+            if (targetCustomer && targetCustomer !== userId) {
+              return NextResponse.json({ error: 'Forbidden. You cannot view other customers\' requests.' }, { status: 403 });
+            }
+          } else {
+            const statusFilter = filters?.find((f: any) => f.column === 'status');
+            const hasStatusFilter = statusFilter && (statusFilter.value === 'OPEN' || statusFilter.value === 'ACCEPTED' || (Array.isArray(statusFilter.value) && statusFilter.value.every((v: string) => v === 'OPEN' || v === 'ACCEPTED')));
+            
+            if (targetCustomer && targetCustomer !== userId && !hasStatusFilter) {
+              return NextResponse.json({ error: 'Forbidden. Providers can only query open requests.' }, { status: 403 });
+            }
+          }
+        }
+      }
+
+      if (table === 'orders') {
+        const targetId = id || filterMap['id'];
+        if (targetId) {
+          const orderRecord = await mongoDb.collection('orders').findOne({ id: targetId });
+          if (orderRecord && orderRecord.customer_id !== userId && orderRecord.provider_id !== userId) {
+            return NextResponse.json({ error: 'Forbidden. You are not a participant in this order.' }, { status: 403 });
+          }
+        }
+        if (action === 'select') {
+          const targetCustomer = filterMap['customer_id'];
+          const targetProvider = filterMap['provider_id'];
+          
+          if (!targetCustomer && !targetProvider && !targetId) {
+            return NextResponse.json({ error: 'Forbidden. General orders queries are restricted.' }, { status: 403 });
+          }
+          if (targetCustomer && targetCustomer !== userId && targetProvider !== userId) {
+            return NextResponse.json({ error: 'Forbidden. Participant mismatch.' }, { status: 403 });
+          }
+          if (targetProvider && targetProvider !== userId && targetCustomer !== userId) {
+            return NextResponse.json({ error: 'Forbidden. Participant mismatch.' }, { status: 403 });
+          }
+        }
+      }
+
+      if (table === 'chat_messages') {
+        const targetOrderId = filterMap['order_id'] || (data ? data.order_id : null);
+        if (!targetOrderId) {
+          return NextResponse.json({ error: 'Forbidden. Order ID is required for chat operations.' }, { status: 403 });
+        }
+        const orderRecord = await mongoDb.collection('orders').findOne({ id: targetOrderId });
+        if (!orderRecord || (orderRecord.customer_id !== userId && orderRecord.provider_id !== userId)) {
+          return NextResponse.json({ error: 'Forbidden. You do not have access to this chat room.' }, { status: 403 });
+        }
+        if (action === 'insert' && data && data.sender_id && data.sender_id !== userId) {
+          return NextResponse.json({ error: 'Forbidden. Sender ID mismatch.' }, { status: 403 });
+        }
+      }
+
+      if (table === 'disputes') {
+        const targetOrderId = filterMap['order_id'] || (data ? data.order_id : null);
+        if (targetOrderId) {
+          const orderRecord = await mongoDb.collection('orders').findOne({ id: targetOrderId });
+          if (!orderRecord || (orderRecord.customer_id !== userId && orderRecord.provider_id !== userId)) {
+            return NextResponse.json({ error: 'Forbidden. You do not have access to this order\'s disputes.' }, { status: 403 });
+          }
+        }
+      }
+
+      if (table === 'provider_accepts') {
+        const targetProvider = filterMap['provider_id'] || (data ? data.provider_id : null);
+        if (targetProvider && targetProvider !== userId && userRole === 'provider') {
+          return NextResponse.json({ error: 'Forbidden. You can only view/update your own accept records.' }, { status: 403 });
+        }
+      }
+    }
 
     if (action === 'select') {
       // 1. Build MongoDB query filter
@@ -129,6 +308,28 @@ export async function POST(req: NextRequest) {
 
           for (const record of records) {
             record.order = orders.find(o => o.id === record.order_id) || null;
+          }
+        }
+      }
+
+      // 6. Security Sanitization (Strip sensitive credentials)
+      if (records && Array.isArray(records)) {
+        for (const record of records) {
+          if (table === 'users') {
+            sanitizeUser(record);
+          }
+          if (record.customer) {
+            sanitizeUser(record.customer);
+          }
+          if (record.provider) {
+            sanitizeUser(record.provider);
+          }
+          if (record.sender) {
+            sanitizeUser(record.sender);
+          }
+          if (record.order) {
+            if (record.order.customer) sanitizeUser(record.order.customer);
+            if (record.order.provider) sanitizeUser(record.order.provider);
           }
         }
       }
