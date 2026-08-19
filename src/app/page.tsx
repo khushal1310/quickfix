@@ -196,6 +196,26 @@ export default function LandingPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [liveReviews, setLiveReviews] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchLiveReviews();
+  }, []);
+
+  const fetchLiveReviews = async () => {
+    try {
+      const { data } = await supabase
+        .from('platform_reviews')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (data && data.length > 0) {
+        setLiveReviews(data);
+      }
+    } catch (err) {
+      console.error('Error fetching live reviews:', err);
+    }
+  };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +232,7 @@ export default function LandingPage() {
       setReviewName('');
       setReviewComment('');
       setReviewRating(5);
+      fetchLiveReviews(); // Refresh testimonials list instantly
       setTimeout(() => setReviewSuccess(false), 5000);
     } catch (err) {
       console.error(err);
@@ -412,18 +433,18 @@ export default function LandingPage() {
             viewport={{ once: true, margin: '-50px' }}
             className="grid md:grid-cols-3 gap-6"
           >
-            {[
-              { name: 'Sarah Miller', role: 'Home Owner', review: 'QuickFix saved my weekend! I had a clogged sink and found a plumber who fixed it within 45 minutes of posting my request. The instant messaging and profile checks were seamless.', rating: 5 },
-              { name: 'David Carter', role: 'Electrician Provider', review: 'As a provider, I love the wallet and notification system. I receive instant alerts of nearby jobs, accept them, and can start working immediately. Highly recommended!', rating: 5 },
-              { name: 'Emma Watson', role: 'Property Manager', review: 'The dispute management and order tracking makes managing repairs across my properties so easy. The platform fee is fair and stays locked in hold until I confirm.', rating: 5 }
-            ].map((test, idx) => (
+            {(liveReviews.length > 0 ? liveReviews : [
+              { name: 'Sarah Miller', role: 'Home Owner', comment: 'QuickFix saved my weekend! I had a clogged sink and found a plumber who fixed it within 45 minutes of posting my request. The instant messaging and profile checks were seamless.', rating: 5 },
+              { name: 'David Carter', role: 'Electrician Provider', comment: 'As a provider, I love the wallet and notification system. I receive instant alerts of nearby jobs, accept them, and can start working immediately. Highly recommended!', rating: 5 },
+              { name: 'Emma Watson', role: 'Property Manager', comment: 'The dispute management and order tracking makes managing repairs across my properties so easy. The platform fee is fair and stays locked in hold until I confirm.', rating: 5 }
+            ]).map((test, idx) => (
               <motion.div key={idx} variants={itemVariants} className="h-full">
                 <TiltCard className="p-6 bg-background/80 border border-border rounded-2xl flex flex-col justify-between h-full">
                   <div>
                     <div className="flex gap-1 text-yellow-500 mb-4">
-                      {Array.from({ length: test.rating }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
+                      {Array.from({ length: test.rating || 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
                     </div>
-                    <p className="text-sm text-foreground italic leading-relaxed">&ldquo;{test.review}&rdquo;</p>
+                    <p className="text-sm text-foreground italic leading-relaxed">&ldquo;{test.comment || test.review}&rdquo;</p>
                   </div>
                   <div className="mt-6 flex items-center gap-3">
                     <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary text-sm shrink-0">
@@ -431,7 +452,7 @@ export default function LandingPage() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-foreground">{test.name}</h4>
-                      <span className="text-xs text-muted-foreground">{test.role}</span>
+                      <span className="text-xs text-muted-foreground">{test.role || 'Verified User'}</span>
                     </div>
                   </div>
                 </TiltCard>

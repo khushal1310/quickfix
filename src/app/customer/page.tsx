@@ -296,6 +296,7 @@ export default function CustomerDashboard() {
   const [landmark, setLandmark] = useState('');
   const [reqLatitude, setReqLatitude] = useState<number | null>(null);
   const [reqLongitude, setReqLongitude] = useState<number | null>(null);
+  const [upiOrder, setUpiOrder] = useState<any | null>(null);
 
   // Automatically query user geolocation on page load
   useEffect(() => {
@@ -1497,6 +1498,19 @@ export default function CustomerDashboard() {
                                 </Button>
                               )}
 
+                              {/* Pay via UPI */}
+                              {(order.status === 'SELECTED' || order.status === 'IN_PROGRESS' || order.status === 'COMPLETED') && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="rounded-lg border-primary text-primary hover:bg-primary/5 font-bold flex items-center gap-1.5 h-9"
+                                  onClick={() => setUpiOrder(order)}
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                  Pay via UPI
+                                </Button>
+                              )}
+
                               {/* Raise Dispute */}
                               {order.status !== 'DISPUTED' && order.status !== 'CANCELLED' && (
                                 <Button 
@@ -1977,6 +1991,74 @@ export default function CustomerDashboard() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Submitting...
                 </span>
               ) : 'Submit & Release Funds'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* UPI Payment Modal */}
+      <Dialog open={upiOrder !== null} onOpenChange={(open) => !open && setUpiOrder(null)}>
+        <DialogContent className="max-w-md border-border bg-card p-6 rounded-2xl shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-primary">
+              <DollarSign className="h-6 w-6 text-primary" />
+              Pay Service Fee via UPI
+            </DialogTitle>
+            <DialogDescription>
+              Scan the QR code or click the button below to pay directly using any UPI app (GPay, PhonePe, Paytm, BHIM, etc.).
+            </DialogDescription>
+          </DialogHeader>
+
+          {upiOrder && (() => {
+            const amount = upiOrder.request?.budget || 250;
+            const upiLink = `upi://pay?pa=quickfixlocalsevaapp@okaxis&pn=QuickFix&am=${amount}&cu=INR&tn=QuickFix_Order_${upiOrder.id}`;
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiLink)}`;
+            const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPod|iPad/i.test(navigator.userAgent);
+
+            return (
+              <div className="flex flex-col items-center justify-center space-y-5 py-4">
+                <div className="text-center">
+                  <span className="text-xs text-muted-foreground uppercase font-bold block">Amount to Pay</span>
+                  <span className="text-3xl font-black text-foreground">₹{amount}</span>
+                </div>
+
+                {!isMobile ? (
+                  /* Desktop QR Code */
+                  <div className="flex flex-col items-center space-y-2.5 p-3 bg-white rounded-2xl border border-border shadow-inner">
+                    <img src={qrCodeUrl} alt="UPI Payment QR Code" className="h-44 w-44 object-contain" />
+                    <span className="text-[10px] font-bold text-gray-500">Scan using any UPI App</span>
+                  </div>
+                ) : (
+                  /* Mobile Direct Link */
+                  <div className="w-full">
+                    <a href={upiLink} className="w-full">
+                      <Button className="w-full py-6 rounded-xl font-black text-base bg-primary text-white shadow-lg hover:bg-primary/95 flex items-center justify-center gap-2">
+                        📱 Pay with UPI Apps
+                      </Button>
+                    </a>
+                    <span className="text-[10px] text-muted-foreground text-center block mt-2">
+                      Launches Google Pay, PhonePe, or Paytm automatically
+                    </span>
+                  </div>
+                )}
+
+                <div className="w-full border-t border-border pt-4 text-center">
+                  <p className="text-xs text-muted-foreground leading-normal">
+                    After completing the payment in your UPI app, please return here and click <strong>Confirm Completion</strong> to close the request and rate your provider.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
+          <DialogFooter className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl w-full"
+              onClick={() => setUpiOrder(null)}
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

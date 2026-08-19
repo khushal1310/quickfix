@@ -118,6 +118,7 @@ export default function AccountPage() {
 
   // Aadhaar KYC state variables
   const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
   const [kycStep, setKycStep] = useState<'input' | 'loading' | 'otp' | 'success'>('input');
   const [loadingStepText, setLoadingStepText] = useState('');
   const [kycOtp, setKycOtp] = useState('');
@@ -645,11 +646,32 @@ export default function AccountPage() {
         throw new Error('KYC Rejected: You must be 18 years or older to verify as a service provider.');
       }
 
+      // Upload Aadhaar file if available
+      let publicUrl = '';
+      if (aadhaarFile) {
+        const fileExt = aadhaarFile.name.split('.').pop() || 'jpg';
+        const fileName = `${authUser?.id}-${Date.now()}.${fileExt}`;
+        const filePath = `aadhaar/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('aadhaar-documents')
+          .upload(filePath, aadhaarFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage
+          .from('aadhaar-documents')
+          .getPublicUrl(filePath);
+        publicUrl = data.publicUrl;
+      }
+
       const { error } = await supabase
         .from('users')
         .update({
-          kyc_status: 'verified',
-          verification_status: 'verified'
+          kyc_status: 'pending',
+          verification_status: 'pending',
+          aadhaar_number: aadhaarNumber,
+          aadhaar_image: publicUrl
         })
         .eq('id', authUser?.id);
 
@@ -659,16 +681,18 @@ export default function AccountPage() {
       const storedUser = localStorage.getItem('qf_user');
       if (storedUser) {
         const u = JSON.parse(storedUser);
-        u.kycStatus = 'verified';
-        u.verificationStatus = 'verified';
+        u.kycStatus = 'pending';
+        u.verificationStatus = 'pending';
+        u.aadhaar_number = aadhaarNumber;
+        u.aadhaar_image = publicUrl;
         localStorage.setItem('qf_user', JSON.stringify(u));
         // Update Zustand state
         useAuth.setState({ user: u });
       }
 
-      toastSuccess('Aadhaar KYC Verification Successful!');
-      setKycStep('success');
-      setProfile(prev => prev ? { ...prev, kycStatus: 'verified', verificationStatus: 'verified' } : null);
+      toastSuccess('Aadhaar document submitted for review!');
+      setKycStep('input');
+      setProfile(prev => prev ? { ...prev, kycStatus: 'pending', verificationStatus: 'pending', aadhaar_number: aadhaarNumber, aadhaar_image: publicUrl } : null);
     } catch (err: any) {
       toastError(err.message || 'Verification update failed.');
     } finally {
@@ -1429,12 +1453,27 @@ export default function AccountPage() {
                         <div className="flex justify-between"><span className="text-muted-foreground">Last Verified:</span><span className="font-bold">Just now / Recent</span></div>
                       </div>
                     </div>
+                  ) : profile.kycStatus === 'pending' || kycStep === 'pending' ? (
+                    <div className="space-y-4 text-center py-4">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">
+                        <Clock className="h-7 w-7 text-amber-500" />
+                      </div>
+                      <h4 className="text-lg font-extrabold text-foreground">Verification Pending</h4>
+                      <p className="text-sm text-muted-foreground leading-normal px-2">
+                        Your Aadhaar card photo has been uploaded and is currently undergoing verification by our admin team. This process typically takes less than 24 hours.
+                      </p>
+                      <div className="text-left mt-6 border border-border p-4 rounded-2xl bg-muted/20 space-y-2 text-xs">
+                        <div className="flex justify-between"><span className="text-muted-foreground">ID Type:</span><span className="font-bold">Aadhaar Card</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Status:</span><span className="font-bold text-amber-500">Pending Review</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Aadhaar Number:</span><span className="font-bold">{profile.aadhaar_number || '****-****-****'}</span></div>
+                      </div>
+                    </div>
                   ) : kycStep === 'input' ? (
                     <form onSubmit={handleAadhaarSubmit} className="space-y-4 py-2">
                       <div className="text-center mb-4">
                         <ShieldCheck className="h-10 w-10 text-primary mx-auto mb-2" />
                         <h4 className="text-base font-bold text-foreground">Aadhaar Card KYC</h4>
-                        <p className="text-xs text-muted-foreground mt-1">Verify your identity instantly using your Aadhaar number</p>
+                        <p className="text-xs text-muted-foreground mt-1">Verify your identity instantly using your Aadhaar number and document upload</p>
                       </div>
                       
                       <div className="space-y-1.5">
@@ -1452,6 +1491,21 @@ export default function AccountPage() {
                             }
                             setAadhaarNumber(parts.join('-'));
                           }}
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Upload Aadhaar Card Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              setAadhaarFile(e.target.files[0]);
+                            }
+                          }}
+                          className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                           required
                         />
                       </div>

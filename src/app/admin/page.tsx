@@ -32,7 +32,7 @@ export default function AdminPanel() {
   }, [isAuthenticated, user, authLoading]);
 
   // UI States
-  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'users' | 'disputes' | 'categories'>('stats');
+  const [activeSubTab, setActiveSubTab] = useState<'stats' | 'users' | 'disputes' | 'categories' | 'kyc'>('stats');
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
@@ -138,6 +138,24 @@ export default function AdminPanel() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateKycStatus = async (providerId: string, status: 'verified' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          kyc_status: status,
+          verification_status: status
+        })
+        .eq('id', providerId);
+
+      if (error) throw error;
+      toastSuccess(`KYC request ${status === 'verified' ? 'approved' : 'rejected'} successfully.`);
+      fetchAdminData();
+    } catch (err: any) {
+      toastError(err.message || 'Failed to update KYC status.');
     }
   };
 
@@ -373,6 +391,14 @@ export default function AdminPanel() {
               className="rounded-xl font-bold"
             >
               Categories ({categoriesList.length})
+            </Button>
+            <Button 
+              variant={activeSubTab === 'kyc' ? 'default' : 'outline'} 
+              onClick={() => setActiveSubTab('kyc')}
+              className="rounded-xl font-bold flex items-center gap-1"
+            >
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              KYC ({usersList.filter(u => u.role === 'provider' && u.kyc_status === 'pending').length})
             </Button>
           </div>
         </div>
@@ -676,6 +702,77 @@ export default function AdminPanel() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {activeSubTab === 'kyc' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom duration-300">
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="text-xl font-black text-foreground">KYC Verification Requests</CardTitle>
+                <CardDescription>Review and approve uploaded provider credentials to activate their service profiles.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {usersList.filter(u => u.role === 'provider' && u.kyc_status === 'pending').length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground text-sm">
+                    No pending KYC verification requests found.
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {usersList.filter(u => u.role === 'provider' && u.kyc_status === 'pending').map((prov) => (
+                      <div key={prov.id} className="p-4 rounded-2xl border border-border bg-muted/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <img 
+                            src={prov.profile_image || `https://api.dicebear.com/7.x/adventurer/svg?seed=${prov.full_name}`}
+                            alt={prov.full_name}
+                            className="h-12 w-12 rounded-full border border-primary/20 object-cover mt-1"
+                          />
+                          <div>
+                            <h4 className="font-bold text-foreground text-base">{prov.full_name}</h4>
+                            <span className="text-xs text-primary font-black uppercase">{prov.service_category} Helper</span>
+                            <div className="text-xs text-muted-foreground mt-1.5 space-y-1">
+                              <div><strong>Mobile:</strong> {prov.mobile_number}</div>
+                              <div><strong>Aadhaar Number:</strong> {prov.aadhaar_number || 'N/A'}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {prov.aadhaar_image && (
+                          <div className="w-full md:w-auto">
+                            <span className="text-xs text-muted-foreground font-bold block mb-1">Aadhaar Card Photo</span>
+                            <a href={prov.aadhaar_image} target="_blank" rel="noopener noreferrer">
+                              <img 
+                                src={prov.aadhaar_image} 
+                                alt="Aadhaar Card Preview" 
+                                className="h-20 w-36 rounded-xl object-cover border border-border hover:opacity-85 transition-opacity" 
+                              />
+                            </a>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 w-full md:w-auto">
+                          <Button 
+                            className="w-full md:w-auto rounded-xl bg-green-500 text-white hover:bg-green-600 font-bold flex items-center gap-1.5"
+                            onClick={() => handleUpdateKycStatus(prov.id, 'verified')}
+                          >
+                            <Check className="h-4 w-4" />
+                            Approve
+                          </Button>
+                          <Button 
+                            variant="destructive"
+                            className="w-full md:w-auto rounded-xl font-bold flex items-center gap-1.5"
+                            onClick={() => handleUpdateKycStatus(prov.id, 'rejected')}
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
       </main>
