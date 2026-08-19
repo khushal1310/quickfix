@@ -46,11 +46,9 @@ export function Navbar() {
         {/* Branding Logo */}
         <motion.div whileHover={{ scale: 1.04 }} className="flex">
           <Link href={isAuthenticated && user ? `/${user.role}` : "/"} className="flex items-center gap-2 select-none">
-            <motion.span whileHover={{ rotate: 12 }} className="insta-gradient p-1.5 rounded-lg text-white block">
-              <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-              </svg>
-            </motion.span>
+            <motion.div whileHover={{ scale: 1.08, rotate: 5 }} whileTap={{ scale: 0.95 }} className="block shrink-0">
+              <img src="/logo.png" alt="QuickFix Logo" className="h-8 w-8 rounded-lg shadow-sm object-cover" />
+            </motion.div>
             <span className="text-xl font-black tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
               QuickFix
             </span>
