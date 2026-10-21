@@ -40,7 +40,6 @@ export default function LoginPage() {
         setErrorMsg(null);
         const token = response.credential;
         
-        // Decode the JWT token payload
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
         const jsonPayload = decodeURIComponent(
@@ -80,12 +79,29 @@ export default function LoginPage() {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      (window as any).google?.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredentialResponse,
-      });
-      // Optionally trigger One Tap prompt
-      (window as any).google?.accounts.id.prompt();
+      try {
+        (window as any).google?.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          // Don't auto-select or show One Tap unless domain is authorized
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        // Only show One Tap prompt — wrapped in try-catch so
+        // unauthorized domains don't crash the whole page
+        try {
+          (window as any).google?.accounts.id.prompt((notification: any) => {
+            // silently ignore prompt errors (e.g. unregistered domain)
+          });
+        } catch (_promptErr) {
+          // One Tap not available on this domain — ignore
+        }
+      } catch (_initErr) {
+        // Google SDK init failed — ignore, button-based flow still works
+      }
+    };
+    script.onerror = () => {
+      // Google SDK failed to load — ignore silently
     };
     document.body.appendChild(script);
 
@@ -93,7 +109,7 @@ export default function LoginPage() {
       try {
         document.body.removeChild(script);
       } catch (e) {
-        // script might have been removed already
+        // already removed
       }
     };
   }, [loginWithGoogle, router, toastSuccess, toastError]);

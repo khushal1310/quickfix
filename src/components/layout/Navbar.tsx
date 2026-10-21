@@ -111,16 +111,16 @@ export function Navbar() {
                 {user.profileImage ? (
                   <img
                     src={user.profileImage}
-                    alt={user.fullName}
+                    alt={user.fullName || 'User'}
                     className="h-8 w-8 rounded-full border border-primary/20 object-cover"
                   />
                 ) : (
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                    {user.fullName.slice(0, 2).toUpperCase()}
+                    {(user.fullName || 'U').slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <span className="hidden md:inline text-sm font-semibold text-foreground">
-                  {user.fullName.split(' ')[0]}
+                  {(user.fullName || 'User').split(' ')[0]}
                 </span>
               </Link>
 

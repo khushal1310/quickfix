@@ -173,7 +173,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       if (!res.ok) {
         throw new Error(data.error || 'Failed to request email verification OTP.');
       }
-      return { success: true, otp: data.otp };
+      return { success: true, otp: data.demo_otp || data.otp };
     } catch (err: any) {
       set({ error: err.message });
       return { success: false, error: err.message };

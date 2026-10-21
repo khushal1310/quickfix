@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Signup email verification OTP generated successfully.',
+      // In demo mode (no email service), expose OTP so user can complete verification
+      ...(emailResult.success === true && !process.env.BREVO_API_KEY ? { demo_otp: otpCode } : {}),
     });
   } catch (error: any) {
     console.error('Email OTP Request Error:', error);

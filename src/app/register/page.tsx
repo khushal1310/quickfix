@@ -83,6 +83,8 @@ export default function RegisterPage() {
   const selectedRole = watch('role');
   const emailVal = watch('email');
 
+  const [demoOtp, setDemoOtp] = useState<string | null>(null);
+
   const handleSendEmailOtp = async () => {
     if (!emailVal || !emailVal.includes('@')) {
       toastError('Please enter a valid email address.');
@@ -94,7 +96,14 @@ export default function RegisterPage() {
       const res = await sendEmailOtp(emailVal);
       if (res.success) {
         setEmailOtpSent(true);
-        toastSuccess('OTP code sent to your email!');
+        if (res.otp) {
+          // Demo mode: no email service configured — show OTP on screen
+          setDemoOtp(res.otp);
+          setEmailOtpCode(res.otp);
+          toastSuccess(`Demo OTP: ${res.otp} — auto-filled below!`);
+        } else {
+          toastSuccess('OTP code sent to your email!');
+        }
       } else {
         toastError(res.error || 'Failed to send verification OTP.');
       }
@@ -128,10 +137,6 @@ export default function RegisterPage() {
   };
 
   const onRegisterSubmit = async (data: any) => {
-    if (!emailVerified) {
-      toastError('Please verify your email address first.');
-      return;
-    }
     if (data.password !== data.confirmPassword) {
       toastError('Passwords do not match.');
       return;
@@ -253,8 +258,15 @@ export default function RegisterPage() {
               </div>
 
               {/* Email OTP Verification Block */}
-              {!emailVerified && emailOtpSent && (
+              {emailVal && !emailVerified && emailOtpSent && (
                 <div className="space-y-2 p-3 bg-muted/30 border border-border/80 rounded-xl">
+                  {demoOtp && (
+                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-2">
+                      <span className="text-amber-500 text-xs font-bold">📧 Demo Mode:</span>
+                      <span className="text-amber-600 text-xs">No email service — OTP is </span>
+                      <span className="font-mono font-black text-amber-600 text-sm tracking-widest">{demoOtp}</span>
+                    </div>
+                  )}
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email Verification Code</label>
                     <div className="flex gap-2">
@@ -357,7 +369,7 @@ export default function RegisterPage() {
                 type="submit" 
                 size="lg" 
                 className="w-full rounded-xl bg-primary text-white hover:bg-primary-hover font-bold mt-2" 
-                disabled={loading || !emailVerified}
+                disabled={loading}
               >
                 {loading ? (
                   <>

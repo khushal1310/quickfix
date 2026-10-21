@@ -77,7 +77,7 @@ export function BottomNav() {
           {user.profileImage ? (
             <img 
               src={user.profileImage} 
-              alt={user.fullName} 
+              alt={user.fullName || 'User'} 
               className="h-5 w-5 rounded-full object-cover border border-primary/20"
             />
           ) : (

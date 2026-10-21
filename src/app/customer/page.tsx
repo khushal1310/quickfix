@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   Sparkles, Wrench, Zap, Cpu, Paintbrush, Bug, 
   MapPin, Plus, Trash, Image as ImageIcon, Loader2, Star, Check, Phone, MessageSquare, AlertTriangle, ShieldAlert, History,
-  Home, Briefcase, ArrowLeft, Clock
+  Home, Briefcase, ArrowLeft, Clock, DollarSign
 } from 'lucide-react';
 import { formatCurrency, formatDate, getSyncedNow } from '@/lib/utils';
 import { LeafletMap } from '@/components/ui/LeafletMap';
