@@ -628,8 +628,15 @@ export default function CustomerDashboard() {
         setReqLatitude(latitude);
         setReqLongitude(longitude);
         try {
-          // Query OpenStreetMap Nominatim for real-time reverse geocoding based on GPS coords
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en&zoom=18&addressdetails=1`);
+          // 6s timeout for Nominatim fetch via AbortController
+          const controller = new AbortController();
+          const fetchTimeout = setTimeout(() => controller.abort(), 6000);
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en&zoom=18&addressdetails=1`,
+            { signal: controller.signal }
+          );
+          clearTimeout(fetchTimeout);
+
           if (res.ok) {
             const data = await res.json();
             const addr = data.address || {};
@@ -661,23 +668,36 @@ export default function CustomerDashboard() {
 
             toastSuccess('📍 Location prefilled using GPS!');
           } else {
-            throw new Error('Reverse geocoding response not OK');
+            throw new Error('Reverse geocoding failed');
           }
-        } catch (e) {
-          console.error(e);
-          setArea('Local Street');
-          setCity('Local City');
-          toastSuccess('GPS coordinates loaded!');
+        } catch (e: any) {
+          // Even if Nominatim fails, coords are saved
+          if (e?.name === 'AbortError') {
+            toastSuccess(`📍 GPS coordinates saved! Enter area manually.`);
+          } else {
+            console.error(e);
+            toastSuccess('📍 GPS coordinates saved!');
+          }
         } finally {
           setFetchingLocation(false);
         }
       },
       (error) => {
-        console.error(error);
-        setArea('Tech District');
-        setCity('Local City');
         setFetchingLocation(false);
-        toastError('Location access denied. Manual entry loaded.');
+        if (error.code === 1) {
+          toastError('Location permission denied. Browser settings ma allow karo.');
+        } else if (error.code === 2) {
+          toastError('Location unavailable. GPS/network check karo.');
+        } else if (error.code === 3) {
+          toastError('GPS timeout. Fari try karo ya address manually dakhlo.');
+        } else {
+          toastError('Location na madi. Address manually dakhlo.');
+        }
+      },
+      {
+        enableHighAccuracy: false, // Network/WiFi use kare — satellite karta fast
+        timeout: 8000,             // 8 second ma give up
+        maximumAge: 30000,         // 30 second purani cached location vaaprse — instant!
       }
     );
   };
