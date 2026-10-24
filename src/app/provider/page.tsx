@@ -191,25 +191,28 @@ export default function ProviderDashboard() {
   }, []);
 
   const getInterpolatedCoordinates = (order: any) => {
-    const custLat = order.request?.latitude || 23.0225;
-    const custLng = order.request?.longitude || 72.5714;
+    const custLat = order.request?.latitude || null;
+    const custLng = order.request?.longitude || null;
 
-    const lat = providerLat || order.provider?.latitude || 23.0240;
-    const lng = providerLng || order.provider?.longitude || 72.5720;
+    const lat = providerLat || order.provider?.latitude || null;
+    const lng = providerLng || order.provider?.longitude || null;
+
+    if (!lat || !lng || !custLat || !custLng) {
+      return { lat, lng, custLat, custLng, progressPercent: 0, etaMin: 0, hasCoords: false };
+    }
 
     const distance = getDistanceKm(lat, lng, custLat, custLng);
-    // Estimate ETA at 30km/h (2 minutes per km)
     const etaMin = distance > 0.05 ? Math.max(1, Math.round(distance * 2)) : 0;
     const progressPercent = distance > 0.05 ? Math.max(0, Math.min(95, (1 - distance / 5) * 100)) : 100;
 
-    return { lat, lng, progressPercent, etaMin };
+    return { lat, lng, custLat, custLng, progressPercent, etaMin, hasCoords: true };
   };
 
   // Category details
   const [providerCategory, setProviderCategory] = useState<any | null>(null);
   const [dbUser, setDbUser] = useState<any | null>(null);
-  const [providerLat, setProviderLat] = useState<number>(23.0240);
-  const [providerLng, setProviderLng] = useState<number>(72.5720);
+  const [providerLat, setProviderLat] = useState<number | null>(null);
+  const [providerLng, setProviderLng] = useState<number | null>(null);
 
 
   useEffect(() => {
@@ -236,9 +239,9 @@ export default function ProviderDashboard() {
         console.warn('Provider geolocation watch error:', err);
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false, // WiFi/network — satellite karta fast
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 15000,         // 15s cached location allow
       }
     );
 
@@ -854,10 +857,7 @@ export default function ProviderDashboard() {
                 ) : (
                   <div className="space-y-6">
                     {activeOrders.map((order) => {
-                      const { lat, lng, progressPercent, etaMin } = getInterpolatedCoordinates(order);
-                      const custLat = order.request?.latitude || 23.0225;
-                      const custLng = order.request?.longitude || 72.5714;
-                      const distance = getDistanceKm(lat, lng, custLat, custLng);
+                      const coords = getInterpolatedCoordinates(order);
 
                       const budgetVal = order.request?.budget || 0;
                       const platformCommission = Math.round(budgetVal * 0.10);
@@ -916,17 +916,25 @@ export default function ProviderDashboard() {
                           <div className="p-5 space-y-4">
                             {/* Map Visualizer */}
                             <div className="relative">
-                              <LeafletMap
-                                providerLat={lat}
-                                providerLng={lng}
-                                customerLat={custLat}
-                                customerLng={custLng}
-                                orderId={order.id}
-                              />
+                              {coords.hasCoords ? (
+                                <LeafletMap
+                                  providerLat={coords.lat!}
+                                  providerLng={coords.lng!}
+                                  customerLat={coords.custLat!}
+                                  customerLng={coords.custLng!}
+                                  orderId={order.id}
+                                />
+                              ) : (
+                                <div className="h-48 rounded-2xl bg-muted/30 border border-border flex flex-col items-center justify-center gap-2">
+                                  <MapPin className="h-8 w-8 text-muted-foreground animate-pulse" />
+                                  <p className="text-xs text-muted-foreground font-semibold">Waiting for real GPS location...</p>
+                                  <p className="text-[10px] text-muted-foreground/60">Location allow karso etle map dekhashе</p>
+                                </div>
+                              )}
                               {/* Floating ETA Label Overlay */}
                               <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
                                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                                {etaMin > 0 ? `${etaMin} mins away from customer (${distance.toFixed(2)} km)` : 'Arrived'}
+                                {!coords.hasCoords ? 'Waiting for GPS...' : coords.etaMin > 0 ? `${coords.etaMin} mins away` : 'Arrived!'}
                               </div>
                             </div>
 
@@ -992,8 +1000,9 @@ export default function ProviderDashboard() {
                                     <div>
                                       <span className="text-foreground font-black block">Arrival Status</span>
                                       <span className="text-[10px] text-muted-foreground block mt-0.5">
-                                        {distance > 2.0 ? 'Driving toward customer location...' :
-                                         distance > 0.05 ? 'Arriving at customer street now...' :
+                                        {!coords.hasCoords ? 'Waiting for GPS...' :
+                                         coords.etaMin > 2 ? 'Driving toward customer location...' :
+                                         coords.etaMin > 0 ? 'Arriving at customer street now...' :
                                          'Arrived at destination!'}
                                       </span>
                                     </div>

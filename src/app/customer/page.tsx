@@ -111,31 +111,45 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 // Live tracking simulator component
 function LiveTrackingSimulator({ order }: { order: any }) {
-  // Provider's real location (fetched from DB)
-  const currentLat = order.provider?.latitude || 23.0240;
-  const currentLng = order.provider?.longitude || 72.5720;
-  
-  // Target location is the customer's request location
-  const destLat = order.request?.latitude || 23.0225;
-  const destLng = order.request?.longitude || 72.5714;
+  // Provider's real GPS location from DB
+  const currentLat = order.provider?.latitude;
+  const currentLng = order.provider?.longitude;
 
-  const distance = getDistanceKm(currentLat, currentLng, destLat, destLng);
-  // Estimate ETA at 30km/h (2 minutes per km)
+  // Customer's request GPS location
+  const destLat = order.request?.latitude;
+  const destLng = order.request?.longitude;
+
+  // If either location is missing, show waiting state
+  const hasRealCoords = currentLat && currentLng && destLat && destLng;
+
+  const distance = hasRealCoords ? getDistanceKm(currentLat, currentLng, destLat, destLng) : 0;
   const etaMin = distance > 0.05 ? Math.max(1, Math.round(distance * 2)) : 0;
-  const etaText = etaMin > 0 ? `${etaMin} mins away from you (${distance.toFixed(2)} km)` : 'Arrived at destination';
+  const etaText = !hasRealCoords
+    ? 'Waiting for GPS location...'
+    : etaMin > 0
+      ? `${etaMin} mins away from you (${distance.toFixed(2)} km)`
+      : 'Arrived at destination';
   
   return (
     <div className="space-y-4">
       {/* Map Header / Live Route Map */}
       <div className="relative mt-2">
-        <LeafletMap
-          providerLat={currentLat}
-          providerLng={currentLng}
-          customerLat={destLat}
-          customerLng={destLng}
-          orderId={order.id}
-        />
-        
+        {hasRealCoords ? (
+          <LeafletMap
+            providerLat={currentLat}
+            providerLng={currentLng}
+            customerLat={destLat}
+            customerLng={destLng}
+            orderId={order.id}
+          />
+        ) : (
+          <div className="h-48 rounded-2xl bg-muted/30 border border-border flex flex-col items-center justify-center gap-2">
+            <MapPin className="h-8 w-8 text-muted-foreground animate-pulse" />
+            <p className="text-xs text-muted-foreground font-semibold">Waiting for real GPS location...</p>
+            <p className="text-[10px] text-muted-foreground/60">Provider ne location allow karvanu kaho</p>
+          </div>
+        )}
+
         {/* Floating ETA Label Overlay */}
         <div className="absolute top-4 left-4 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-md z-[999] flex items-center gap-1.5 animate-pulse">
           <span className="w-2 h-2 rounded-full bg-green-500" />
@@ -850,8 +864,8 @@ export default function CustomerDashboard() {
           city,
           budget: budget ? parseFloat(budget) : null,
           status: 'OPEN',
-          latitude: reqLatitude || 23.0225,
-          longitude: reqLongitude || 72.5714,
+          latitude: reqLatitude,
+          longitude: reqLongitude,
         })
         .select('*')
         .single();
