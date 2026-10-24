@@ -369,17 +369,36 @@ export default function CustomerDashboard() {
   };
 
   const handleSelectSuggestion = (suggestion: any) => {
-    const displayName = suggestion.display_name;
     const lat = parseFloat(suggestion.lat);
     const lon = parseFloat(suggestion.lon);
     const addrObj = suggestion.address || {};
-    const cityName = addrObj.city || addrObj.town || addrObj.village || addrObj.suburb || addrObj.state_district || 'Ahmedabad';
 
-    setArea(displayName);
+    // Extract landmark/place name (amenity, temple, shop, etc.)
+    const placeName = addrObj.amenity || addrObj.tourism || addrObj.leisure ||
+                      addrObj.place_of_worship || addrObj.shop || addrObj.building || '';
+
+    // Build clean short area: road + neighbourhood/suburb
+    const road = addrObj.road || addrObj.pedestrian || addrObj.path || addrObj.footway || '';
+    const neighbourhood = addrObj.neighbourhood || addrObj.suburb || addrObj.quarter || addrObj.village || '';
+    const areaParts = [road, neighbourhood].filter(Boolean);
+    // Fallback: use first 2 parts of display_name if no road/neighbourhood
+    const cleanArea = areaParts.length > 0
+      ? areaParts.join(', ')
+      : suggestion.display_name.split(',').slice(0, 2).join(',').trim();
+
+    // City
+    const cityName = addrObj.city || addrObj.town || addrObj.municipality ||
+                     addrObj.state_district || addrObj.county || 'Ahmedabad';
+
+    // Show clean short label in search input (first 3 parts of display_name)
+    const shortDisplay = suggestion.display_name.split(',').slice(0, 3).join(',').trim();
+
+    setArea(cleanArea);
     setCity(cityName);
+    if (placeName) setLandmark(placeName);
     setReqLatitude(lat);
     setReqLongitude(lon);
-    setAddressSearchQuery(displayName);
+    setAddressSearchQuery(shortDisplay);
     setAddressSuggestions([]);
   };
 
@@ -610,30 +629,43 @@ export default function CustomerDashboard() {
         setReqLongitude(longitude);
         try {
           // Query OpenStreetMap Nominatim for real-time reverse geocoding based on GPS coords
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en`);
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=en&zoom=18&addressdetails=1`);
           if (res.ok) {
             const data = await res.json();
             const addr = data.address || {};
-            
-            // Extract a clean neighborhood/street and city/town/state
-            const road = addr.road || '';
-            const neighborhood = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.subdistrict || '';
+
+            // Street / area
+            const road = addr.road || addr.pedestrian || addr.path || addr.footway || '';
+            const neighbourhood = addr.neighbourhood || addr.suburb || addr.quarter || addr.village || '';
             const county = addr.county || addr.district || '';
-            
-            // Build a clean, natural street and area address without coordinate numbers
-            const parts = [road, neighborhood, county].filter(Boolean);
-            const streetAndArea = parts.length > 0 ? parts.join(', ') : 'Local Area';
-            const cityName = addr.city || addr.town || addr.municipality || addr.state || 'Local City';
-            
+            const areaParts = [road, neighbourhood].filter(Boolean);
+            const streetAndArea = areaParts.length > 0
+              ? areaParts.join(', ')
+              : (county || 'Local Area');
+
+            // City
+            const cityName = addr.city || addr.town || addr.municipality ||
+                             addr.state_district || addr.state || 'Local City';
+
+            // Nearest landmark from GPS
+            const nearbyPlace = addr.amenity || addr.tourism || addr.leisure ||
+                                addr.place_of_worship || addr.shop || addr.building || '';
+
+            // Full readable address for search input
+            const searchLabel = [road, neighbourhood, cityName].filter(Boolean).join(', ');
+
             setArea(streetAndArea);
             setCity(cityName);
-            toastSuccess('Location prefilled using GPS!');
+            setAddressSearchQuery(searchLabel);
+            if (nearbyPlace) setLandmark(nearbyPlace);
+
+            toastSuccess('📍 Location prefilled using GPS!');
           } else {
             throw new Error('Reverse geocoding response not OK');
           }
         } catch (e) {
           console.error(e);
-          setArea('Local Street, Tech District');
+          setArea('Local Street');
           setCity('Local City');
           toastSuccess('GPS coordinates loaded!');
         } finally {
